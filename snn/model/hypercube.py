@@ -8,7 +8,7 @@ class Hypercube[T]:
     def __init__(self, dna: Dna):
         self.n_dimension: int = dna.n_dimension
         self.dimension_size: int = dna.dimension_size
-        self.items: list = []
+        self.items: list[T] = []
 
     def __iter__(self):
         return iter(self.items)
