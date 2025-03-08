@@ -1,5 +1,5 @@
-from snn.model.dna import Dna
-from snn.model.hypercube import Position
+from sonin.model.dna import Dna
+from sonin.model.hypercube import Position
 
 # Will accept potential from pre-synaptic neurons
 ACCEPTING = 'accepting'

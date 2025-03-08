@@ -1,6 +1,6 @@
 from typing import Callable, Generator, Self
 
-from snn.model.dna import Dna
+from sonin.model.dna import Dna
 
 
 class Position:

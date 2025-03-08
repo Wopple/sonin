@@ -1,9 +1,9 @@
 from random import seed, randint
 
 from model.neuron import ACCEPTING, ACTIVATED, REFACTORY
-from snn.model.dna import Dna
-from snn.model.hypercube import Hypercube, Position
-from snn.model.neuron import Neuron
+from sonin.model.dna import Dna
+from sonin.model.hypercube import Hypercube, Position
+from sonin.model.neuron import Neuron
 
 # Rules
 #   Conceptually, neurons and synapses are agents making decisions on their own based on interactions and environment.
