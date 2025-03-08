@@ -1,5 +1,5 @@
-from model.dna import Dna
-from model.hypercube import Hypercube
+from sonin.model.dna import Dna
+from sonin.model.hypercube import Hypercube
 
 
 def test_initialize():
