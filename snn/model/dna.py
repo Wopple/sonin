@@ -4,11 +4,11 @@ from math import ceil, log
 class Dna:
     def __init__(
         self,
-        n_synapse: int,
-        n_dimension: int,
-        activation_level: int,
-        refactory_period: int,
-        min_neurons: int,
+        min_neurons: int = 1,
+        n_synapse: int = 1,
+        n_dimension: int = 1,
+        activation_level: int = 1,
+        refactory_period: int = 0,
     ):
         # Number of synapses per neuron
         self.n_synapse: int = n_synapse

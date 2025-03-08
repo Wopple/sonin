@@ -1,5 +1,5 @@
 from snn.model.dna import Dna
-from snn.model.position import Position
+from snn.model.hypercube import Position
 
 # Will accept potential from pre-synaptic neurons
 ACCEPTING = 'accepting'
@@ -12,11 +12,14 @@ REFACTORY = 'refactory'
 
 
 class Neuron:
-    def __init__(self, dna: Dna, position: Position):
+    def __init__(self, dna: Dna, position: Position, excites: bool = True):
         self.dna: Dna = dna
 
         # Position of the neuron in the mind
         self.position: Position = position
+
+        # True if the neuron excites other neurons, False if it inhibits other neurons.
+        self.excites: bool = excites
 
         # Positions of the neurons this neuron is currently connected to
         self.synapses: list[Position] = []
@@ -31,6 +34,10 @@ class Neuron:
         self.t_refactory_end: int = 0
 
         self.initialize()
+
+    @property
+    def inhibits(self) -> bool:
+        return not self.excites
 
     def initialize(self):
         self.synapses = [None] * self.dna.n_synapse
