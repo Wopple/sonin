@@ -5,10 +5,7 @@ from sonin.model.hypercube import Hypercube
 def test_initialize():
     dna = Dna(
         min_neurons=27,
-        n_synapse=4,
         n_dimension=3,
-        activation_level=2,
-        refactory_period=2,
     )
 
     hypercube = Hypercube(dna)
