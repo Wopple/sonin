@@ -3,13 +3,13 @@ class SnapBack:
         # Baseline adjustments happen transparently at get and set time. The step
         # math is easier with a baseline of zero.
         self.baseline: int = baseline
+        self._value: int = 0
 
         self.restore_rate: int = restore_rate
         self.restore_scalar: int = restore_scalar
-        self._value: int = baseline
 
     @property
-    def value(self):
+    def value(self) -> int:
         return self._value + self.baseline
 
     @value.setter

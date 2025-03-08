@@ -1,6 +1,6 @@
 from random import seed, randint
 
-from model.neuron import ACCEPTING, ACTIVATED, REFACTORY
+from model.neuron import ACCEPTING, ACTIVATED
 from sonin.model.dna import Dna
 from sonin.model.hypercube import Hypercube, Position
 from sonin.model.neuron import Neuron
@@ -17,6 +17,7 @@ from sonin.model.neuron import Neuron
 
 # Features
 #   + Neurons can be excitatory or inhibitory.
+#   + Neurons can detect levels of stimulation.
 #   - Neurons can regulate excitation when overstimulated by weakening connections.
 #   - Longer duration stimuli can lead to the initiation of multiple action potentials. The frequency is dependent on the
 #       intensity of the stimulus.
@@ -115,10 +116,7 @@ class Mind:
 
     def step(self, c_time: int):
         for n in self.neurons:
-            if n.state == ACCEPTING and n.potential >= self.dna.activation_level:
-                n.activate()
-            elif n.state == REFACTORY and n.t_refactory_end <= c_time:
-                n.enable()
+            n.step(c_time)
 
         for pre_n in self.neurons:
             if pre_n.state == ACTIVATED:
@@ -140,7 +138,7 @@ dna = Dna(
     min_neurons=100,
     n_synapse=4,
     n_dimension=2,
-    activation_level=2,
+    activation_level=3,
 )
 
 mind = Mind(dna)
@@ -151,7 +149,7 @@ input_neurons = mind.neurons.items[:6]
 output_neurons = mind.neurons.items[-6:]
 
 def print_neurons(msg: str, neurons: list[Neuron]):
-    print(f"{msg}: {[n.potential for n in neurons]}")
+    print(f"{msg}: {[(n.potential, n.stimulation.value) for n in neurons]}")
 
 def print_mind():
     ns = []
