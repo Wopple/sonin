@@ -6,12 +6,8 @@ from sonin.model.synapse import Synapse
 # Will accept potential from pre-synaptic neurons
 ACCEPTING = 'accepting'
 
-# Will send potential to post-synaptic neurons
-ACTIVATED = 'activated'
-
 # Will reject potential from pre-synaptic neurons
 REFACTORY = 'refactory'
-
 
 class Neuron:
     def __init__(self, dna: Dna, position: Position, excites: bool = True):
@@ -34,6 +30,9 @@ class Neuron:
 
         # Current state of the neuron
         self.state: str = ACCEPTING
+
+        # If True, will send potential to post-synaptic neurons
+        self.activated: bool = False
 
         # Time at which to reactivate the neuron
         self.t_refactory_end: int = 0
@@ -63,21 +62,21 @@ class Neuron:
         self.stimulation.step()
 
         if self.state == ACCEPTING and self.potential >= self.dna.activation_level:
-            self.activate()
-        elif self.state == REFACTORY and c_time > self.t_refactory_end:
+            self.activate(c_time)
+        elif self.state == REFACTORY and c_time >= self.t_refactory_end:
             self.enable()
 
     def enable(self):
         self.state = ACCEPTING
 
-    def activate(self):
+    def activate(self, c_time: int):
         self.stimulation.value += 64
         self.potential = 0
-        self.state = ACTIVATED
+        self.activated = True
 
-    def refactor(self, c_time: int):
         if self.dna.refactory_period > 0:
             self.state = REFACTORY
             self.t_refactory_end = c_time + self.dna.refactory_period
-        else:
-            self.enable()
+
+    def deactivate(self):
+        self.activated = False

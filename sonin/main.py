@@ -20,9 +20,9 @@ from sonin.model.neuron import Neuron
 #   + Synapses are entities as well.
 #   + Synapses are bidirectional.
 #   + Synapses can strengthen and weaken.
-#   - Neurons can regulate excitation when overstimulated by weakening connections.
-#   - Longer duration stimuli can lead to the initiation of multiple action potentials. The frequency is dependent on the
-#       intensity of the stimulus.
+#   + Neurons can regulate excitation when overstimulated by weakening connections.
+#   - Longer duration stimuli can lead to the initiation of multiple action potentials. The frequency is dependent on
+#       the intensity of the stimulus.
 # 
 #   - Simple circuits can create behavior like lateral inhibition creating edge enhancement.
 #   - Some neurons periodically activate in bursts even without excitation.
@@ -35,7 +35,8 @@ from sonin.model.neuron import Neuron
 #       is to ensure unidirectional activation along an axon which the code already enforces. It's still possible it has
 #       important behavioral implications.
 #
-#   - Neurons gradually return to their resting potential, both temporal and spatial summation can cause a neuron to fire.
+#   - Neurons gradually return to their resting potential, both temporal and spatial summation can cause a neuron to
+#       fire.
 #
 #   - Some neurons activate for a long period of time based on changes in metabolism.
 #
@@ -48,7 +49,7 @@ from sonin.model.neuron import Neuron
 #     - post-tetanic potentiation
 #   - Synaptic depression reduces the potential passed along when repeats happen with some distance apart.
 #   - Synaptic facilitation increases the potential passed when repeats happen a very short distance apart.
-#       Continued repeats will have a reduced increasing effect.
+#     - Continued repeats will have a reduced increasing effect.
 #   - Post-tetanic potentiation is a lasting increase in synaptic susceptibility after a high frequency series of action
 #       potentials. This is likely related to memory.
 #
@@ -77,8 +78,9 @@ from sonin.model.neuron import Neuron
 #   - Neurons ought to be able to have hurt-box / hit-box regions to constrain synaptic formation.
 #
 #   - Positional determination:
-#       Concentration gradients can have thresholds that affect the fate of cells.
-#       Sequential induction can affect the fate of cells through one of the signaling mechanisms to neighbors.
+#     - Concentration gradients can have thresholds that affect the fate of cells.
+#     - Sequential induction can affect the fate of cells through one of the signaling mechanisms to neighbors.
+#     - Can develop new signals by cloning successful signals and varying them independently.
 #
 #   - Axon guidance is affected by:
 #     - both attractive and repulsive forces
@@ -100,7 +102,7 @@ dna = Dna(
     min_neurons=100,
     n_synapse=4,
     n_dimension=2,
-    activation_level=3,
+    activation_level=24,
 )
 
 mind = Mind(dna)
@@ -115,23 +117,11 @@ def print_neurons(msg: str, neurons: list[Neuron]):
     print(f'{msg}: {[(n.potential, n.stimulation.value) for n in neurons]}')
 
 
-def print_mind():
-    ns = []
-    for idx, n in enumerate(mind.neurons.items):
-        ns.append(n.potential)
-
-        if len(ns) == 7:
-            print(ns)
-            ns = []
-
-
-# print_mind()
 print_neurons('input', input_neurons)
 print_neurons('output', output_neurons)
 
-for i in range(10):
+for i in range(100):
     mind.step(i)
     print()
-    # print_mind()
     print_neurons('input', input_neurons)
     print_neurons('output', output_neurons)
