@@ -1,8 +1,7 @@
-from random import seed, randint
+from random import seed
 
-from model.neuron import ACCEPTING, ACTIVATED
 from sonin.model.dna import Dna
-from sonin.model.hypercube import Hypercube, Position
+from sonin.model.mind import Mind
 from sonin.model.neuron import Neuron
 
 # Rules
@@ -18,6 +17,7 @@ from sonin.model.neuron import Neuron
 # Features
 #   + Neurons can be excitatory or inhibitory.
 #   + Neurons can detect levels of stimulation.
+#   + Synapses are entities as well.
 #   - Neurons can regulate excitation when overstimulated by weakening connections.
 #   - Longer duration stimuli can lead to the initiation of multiple action potentials. The frequency is dependent on the
 #       intensity of the stimulus.
@@ -90,46 +90,6 @@ from sonin.model.neuron import Neuron
 #   - Synapses retract from undernourished neurons.
 #
 #   - There needs to be a way to make it unlikely to reform a disconnected synapse.
-
-
-def random_position(dna: Dna) -> Position:
-    return Position(dna.dimension_size, tuple(randint(0, dna.dimension_size - 1) for _ in range(dna.n_dimension)))
-
-
-class Mind:
-    def __init__(self, dna: Dna):
-        self.dna: Dna = dna
-        self.neurons: Hypercube[Neuron] = Hypercube(dna)
-        self.neurons.initialize(lambda position: Neuron(dna, position))
-
-    def randomize_synapses(self):
-        for n in self.neurons:
-            for i in range(self.dna.n_synapse):
-                n.synapses[i] = random_position(self.dna)
-
-    def randomize_potential(self):
-        for n in self.neurons:
-            if randint(0, 1):
-                n.potential = self.dna.activation_level
-            else:
-                n.potential = 0
-
-    def step(self, c_time: int):
-        for n in self.neurons:
-            n.step(c_time)
-
-        for pre_n in self.neurons:
-            if pre_n.state == ACTIVATED:
-                pre_n.refactor(c_time)
-
-                for position in pre_n.synapses:
-                    post_n = self.neurons.get(position)
-
-                    if post_n.state == ACCEPTING:
-                        if pre_n.excites:
-                            post_n.potential += 1
-                        else:
-                            post_n.potential -= 1
 
 
 seed(0)

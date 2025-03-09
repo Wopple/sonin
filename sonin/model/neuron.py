@@ -1,6 +1,7 @@
 from sonin.model.dna import Dna
 from sonin.model.hypercube import Position
 from sonin.model.stimulation import SnapBack
+from sonin.model.synapse import Synapse
 
 # Will accept potential from pre-synaptic neurons
 ACCEPTING = 'accepting'
@@ -23,7 +24,7 @@ class Neuron:
         self.excites: bool = excites
 
         # Positions of the neurons this neuron is currently connected to
-        self.synapses: list[Position] = []
+        self.synapses: list[Synapse] = []
 
         # Current activation potential of the neuron
         self._potential: int = 0
