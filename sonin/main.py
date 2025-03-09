@@ -18,6 +18,8 @@ from sonin.model.neuron import Neuron
 #   + Neurons can be excitatory or inhibitory.
 #   + Neurons can detect levels of stimulation.
 #   + Synapses are entities as well.
+#   + Synapses are bidirectional.
+#   + Synapses can strengthen and weaken.
 #   - Neurons can regulate excitation when overstimulated by weakening connections.
 #   - Longer duration stimuli can lead to the initiation of multiple action potentials. The frequency is dependent on the
 #       intensity of the stimulus.
@@ -108,8 +110,10 @@ mind.randomize_potential()
 input_neurons = mind.neurons.items[:6]
 output_neurons = mind.neurons.items[-6:]
 
+
 def print_neurons(msg: str, neurons: list[Neuron]):
-    print(f"{msg}: {[(n.potential, n.stimulation.value) for n in neurons]}")
+    print(f'{msg}: {[(n.potential, n.stimulation.value) for n in neurons]}')
+
 
 def print_mind():
     ns = []
@@ -120,14 +124,14 @@ def print_mind():
             print(ns)
             ns = []
 
+
 # print_mind()
-print_neurons("input", input_neurons)
-print_neurons("output", output_neurons)
+print_neurons('input', input_neurons)
+print_neurons('output', output_neurons)
 
 for i in range(10):
     mind.step(i)
     print()
     # print_mind()
-    print_neurons("input", input_neurons)
-    print_neurons("output", output_neurons)
-
+    print_neurons('input', input_neurons)
+    print_neurons('output', output_neurons)

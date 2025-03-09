@@ -23,8 +23,11 @@ class Neuron:
         # True if the neuron excites other neurons, False if it inhibits other neurons
         self.excites: bool = excites
 
-        # Positions of the neurons this neuron is currently connected to
-        self.synapses: list[Synapse] = []
+        # Synapses connected to post neurons (output)
+        self.post_synapses: dict[int, Synapse] = {}
+
+        # Synapses connected to pre neurons (input)
+        self.pre_synapses: dict[int, Synapse] = {}
 
         # Current activation potential of the neuron
         self._potential: int = 0
@@ -53,7 +56,6 @@ class Neuron:
         self._potential = potential
 
     def initialize(self):
-        self.synapses = [None] * self.dna.n_synapse
         self.potential = 0
         self.state = ACCEPTING
 

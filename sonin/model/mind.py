@@ -10,6 +10,39 @@ def random_position(dna: Dna) -> Position:
     return Position(dna.dimension_size, tuple(randint(0, dna.dimension_size - 1) for _ in range(dna.n_dimension)))
 
 
+def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron):
+    pre_position: Position = pre_neuron.position
+    pre_index: int = pre_position.index
+    post_position: Position = post_neuron.position
+    post_index: int = post_position.index
+    synapse: Synapse
+
+    if post_index in pre_neuron.post_synapses:
+        synapse = pre_neuron.post_synapses[post_index]
+        synapse.strength += 1
+    else:
+        synapse = Synapse(1, pre_position, post_position)
+        pre_neuron.post_synapses[post_index] = synapse
+        post_neuron.pre_synapses[pre_index] = synapse
+
+
+def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron):
+    pre_position: Position = pre_neuron.position
+    pre_index: int = pre_position.index
+    post_position: Position = post_neuron.position
+    post_index: int = post_position.index
+    synapse: Synapse
+
+    if post_index in pre_neuron.post_synapses:
+        synapse = pre_neuron.post_synapses[post_index]
+
+        if synapse.strength > 1:
+            synapse.strength -= 1
+        else:
+            del pre_neuron.post_synapses[post_index]
+            del post_neuron.pre_synapses[pre_index]
+
+
 class Mind:
     def __init__(self, dna: Dna):
         self.dna: Dna = dna
@@ -17,9 +50,10 @@ class Mind:
         self.neurons.initialize(lambda position: Neuron(dna, position))
 
     def randomize_synapses(self):
-        for n in self.neurons:
+        for pre_n in self.neurons:
             for i in range(self.dna.n_synapse):
-                n.synapses[i] = Synapse(1, n.position, random_position(self.dna))
+                post_n = self.neurons.get(random_position(self.dna))
+                strengthen_connection(pre_n, post_n)
 
     def randomize_potential(self):
         for n in self.neurons:
@@ -36,7 +70,7 @@ class Mind:
             if pre_n.state == ACTIVATED:
                 pre_n.refactor(c_time)
 
-                for syn in pre_n.synapses:
+                for syn in pre_n.post_synapses.values():
                     if syn.post_neuron is not None:
                         post_n = self.neurons.get(syn.post_neuron)
 

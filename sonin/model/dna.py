@@ -1,6 +1,3 @@
-from math import ceil, log
-
-
 class Dna:
     def __init__(
         self,
@@ -22,9 +19,15 @@ class Dna:
         # Amount of time a neuron stays in the refactory state (min 1)
         self.refactory_period: int = refactory_period
 
-        # Size of each list in a mind's neurons, rounded up from the minimum number of neurons such that
+        # Size of the hypercube of neurons, rounded up from the minimum number of neurons such that
         # dimension_size ^ n_dimension >= min_neurons
-        self.dimension_size: int = int(ceil(log(min_neurons, n_dimension)))
+
+        dimension_size: int = 1
+
+        while dimension_size ** n_dimension < min_neurons:
+            dimension_size += 1
+
+        self.dimension_size: int = dimension_size
 
         # Total number of neurons
         self.n_neuron: int = self.dimension_size ** n_dimension
