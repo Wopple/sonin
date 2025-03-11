@@ -21,11 +21,11 @@ from sonin.model.neuron import Neuron
 #   + Synapses are bidirectional.
 #   + Synapses can strengthen and weaken.
 #   + Neurons can regulate excitation when overstimulated by weakening connections.
-#   - Longer duration stimuli can lead to the initiation of multiple action potentials. The frequency is dependent on
+#   + Longer duration stimuli can lead to the initiation of multiple action potentials. The frequency is dependent on
 #       the intensity of the stimulus.
 # 
 #   - Simple circuits can create behavior like lateral inhibition creating edge enhancement.
-#   - Some neurons periodically activate in bursts even without excitation.
+#   + Some neurons periodically activate in bursts even without excitation.
 #
 #   - Neurons that fire together, wire together.
 #   - Connected neurons that fail to activate together weaken their connection over time.
