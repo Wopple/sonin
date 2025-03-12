@@ -10,7 +10,7 @@ def random_position(dna: Dna) -> Position:
     return Position(dna.dimension_size, tuple(randint(0, dna.dimension_size - 1) for _ in range(dna.n_dimension)))
 
 
-def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int = 1):
+def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int, max_strength: int):
     pre_position: Position = pre_neuron.position
     pre_index: int = pre_position.index
     post_position: Position = post_neuron.position
@@ -19,14 +19,20 @@ def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int
 
     if post_index in pre_neuron.post_synapses:
         synapse = pre_neuron.post_synapses[post_index]
-        synapse.strength += strength
+        synapse.strengthen(strength)
     else:
-        synapse = Synapse(strength, pre_position, post_position)
+        synapse = Synapse(
+            pre_neuron=pre_position,
+            post_neuron=post_position,
+            strength=strength,
+            max_strength=max_strength,
+        )
+
         pre_neuron.post_synapses[post_index] = synapse
         post_neuron.pre_synapses[pre_index] = synapse
 
 
-def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int = 1):
+def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int):
     pre_position: Position = pre_neuron.position
     pre_index: int = pre_position.index
     post_position: Position = post_neuron.position
@@ -53,7 +59,13 @@ class Mind:
         for pre_n in self.neurons:
             for i in range(self.dna.n_synapse):
                 post_n = self.neurons.get(random_position(self.dna))
-                strengthen_connection(pre_n, post_n, 8)
+
+                strengthen_connection(
+                    pre_neuron=pre_n,
+                    post_neuron=post_n,
+                    strength=self.dna.max_neuron_strength // 2,
+                    max_strength=self.dna.max_neuron_strength,
+                )
 
     def randomize_potential(self):
         for n in self.neurons:
@@ -68,14 +80,23 @@ class Mind:
         for n in self.neurons:
             n.step(c_time)
 
-            if n.stimulation.value > 200:
-                syn: Synapse = choice(list(n.pre_synapses.values()))
-                weaken_connection(self.neurons.get(syn.pre_neuron), n)
+            if n.stimulation.value > 100 and len(n.pre_synapses) > 0:
                 n.stimulation.value = 0
+                syn: Synapse = choice(list(n.pre_synapses.values()))
+
+                weaken_connection(
+                    pre_neuron=self.neurons.get(syn.pre_neuron),
+                    post_neuron=n,
+                    strength=self.dna.max_neuron_strength // 2,
+                )
 
         for n in self.neurons:
             if n.activated:
                 self.propagate_potential(n)
+                self.strengthen_simultaneous_activation(n)
+
+        for n in self.neurons:
+            if n.activated:
                 n.deactivate()
 
     def propagate_potential(self, pre_n: Neuron):
@@ -87,3 +108,10 @@ class Mind:
                     post_n.potential += syn.strength
                 else:
                     post_n.potential -= syn.strength
+
+    def strengthen_simultaneous_activation(self, pre_n: Neuron):
+        for syn in pre_n.post_synapses.values():
+            post_n = self.neurons.get(syn.post_neuron)
+
+            if pre_n.position.index != post_n.position.index and post_n.activated:
+                syn.strengthen(1)

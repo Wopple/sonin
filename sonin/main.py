@@ -2,7 +2,7 @@ from random import seed
 
 from sonin.model.dna import Dna
 from sonin.model.mind import Mind
-from sonin.model.neuron import Neuron
+from sonin.model.neuron import Neuron, TetanicPeriod
 
 # Rules
 #   Conceptually, neurons and synapses are agents making decisions on their own based on interactions and environment.
@@ -27,7 +27,7 @@ from sonin.model.neuron import Neuron
 #   - Simple circuits can create behavior like lateral inhibition creating edge enhancement.
 #   + Some neurons periodically activate in bursts even without excitation.
 #
-#   - Neurons that fire together, wire together.
+#   + Neurons that fire together, wire together.
 #   - Connected neurons that fail to activate together weaken their connection over time.
 #   - Not all synapses exhibit this behavior.
 #
@@ -103,6 +103,7 @@ dna = Dna(
     n_synapse=4,
     n_dimension=2,
     activation_level=24,
+    max_neuron_strength=12,
 )
 
 mind = Mind(dna)
@@ -112,9 +113,35 @@ mind.randomize_potential()
 input_neurons = mind.neurons.items[:6]
 output_neurons = mind.neurons.items[-6:]
 
+for i, n in enumerate(input_neurons):
+    n.tetanic_period = TetanicPeriod(
+        threshold=2 + i,
+        activations=i,
+        gap=1,
+    )
+
 
 def print_neurons(msg: str, neurons: list[Neuron]):
     print(f'{msg}: {[(n.potential, n.stimulation.value) for n in neurons]}')
+
+
+def plot_synapses():
+    import matplotlib.pyplot as plt
+
+    line_segments = [(s.pre_neuron.value, s.post_neuron.value) for n in mind.neurons.items for s in n.post_synapses.values()]
+
+    fig, ax = plt.subplots()
+
+    for segment in line_segments:
+        (x1, y1), (x2, y2) = segment
+        ax.plot([x1, x2], [y1, y2], marker='o')
+
+    ax.set_aspect('equal')
+    ax.grid(True)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_title('2D Line Segments')
+    plt.show()
 
 
 print_neurons('input', input_neurons)
@@ -125,3 +152,5 @@ for i in range(100):
     print()
     print_neurons('input', input_neurons)
     print_neurons('output', output_neurons)
+
+plot_synapses()

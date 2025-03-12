@@ -5,6 +5,7 @@ class Dna:
         n_synapse: int = 1,
         n_dimension: int = 1,
         activation_level: int = 1,
+        max_neuron_strength: int = 2,
         refactory_period: int = 0,
     ):
         # Number of synapses per neuron
@@ -15,6 +16,9 @@ class Dna:
 
         # Level at which a neuron activates
         self.activation_level: int = activation_level
+
+        # Neurons cannot propagate more potential than this when activating
+        self.max_neuron_strength: int = max_neuron_strength
 
         # Amount of time a neuron stays in the refactory state (min 1)
         self.refactory_period: int = refactory_period
