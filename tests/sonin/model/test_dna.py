@@ -1,9 +1,9 @@
-import pytest
+from pytest import mark
 
 from sonin.model.dna import Dna
 
 
-@pytest.mark.parametrize(
+@mark.parametrize(
     'min_neurons, n_dimension, expected',
     [
         (1, 1, 1),
@@ -27,7 +27,7 @@ def test_dimension_size(min_neurons: int, n_dimension: int, expected: int):
     assert dna.dimension_size == expected
 
 
-@pytest.mark.parametrize(
+@mark.parametrize(
     'min_neurons, n_dimension, expected',
     [
         (1, 1, 1),

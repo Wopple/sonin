@@ -1,4 +1,4 @@
-import pytest
+from pytest import fixture
 
 from sonin.model.dna import Dna
 from sonin.model.hypercube import Position
@@ -6,22 +6,22 @@ from sonin.model.mind import strengthen_connection, weaken_connection
 from sonin.model.neuron import Neuron
 
 
-@pytest.fixture
+@fixture
 def n_dimension() -> int:
     return 1
 
 
-@pytest.fixture
+@fixture
 def dna(n_dimension: int) -> Dna:
     return Dna(min_neurons=2, n_dimension=n_dimension)
 
 
-@pytest.fixture
+@fixture
 def neuron_1(dna: Dna) -> Neuron:
     return Neuron(dna, Position(dna.n_dimension, (0,)))
 
 
-@pytest.fixture
+@fixture
 def neuron_2(dna: Dna) -> Neuron:
     return Neuron(dna, Position(dna.n_dimension, (1,)))
 
@@ -30,7 +30,7 @@ def test_strengthen_connection_new(neuron_1: Neuron, neuron_2: Neuron):
     assert neuron_2.position.index not in neuron_1.post_synapses
     assert neuron_1.position.index not in neuron_2.pre_synapses
 
-    strengthen_connection(neuron_1, neuron_2)
+    strengthen_connection(neuron_1, neuron_2, 1, 4)
 
     assert neuron_2.position.index in neuron_1.post_synapses
     assert neuron_1.position.index in neuron_2.pre_synapses
@@ -39,8 +39,8 @@ def test_strengthen_connection_new(neuron_1: Neuron, neuron_2: Neuron):
 
 
 def test_strengthen_connection_existing(neuron_1: Neuron, neuron_2: Neuron):
-    strengthen_connection(neuron_1, neuron_2)
-    strengthen_connection(neuron_1, neuron_2)
+    strengthen_connection(neuron_1, neuron_2, 1, 4)
+    strengthen_connection(neuron_1, neuron_2, 1, 4)
 
     assert neuron_2.position.index in neuron_1.post_synapses
     assert neuron_1.position.index in neuron_2.pre_synapses
@@ -49,9 +49,9 @@ def test_strengthen_connection_existing(neuron_1: Neuron, neuron_2: Neuron):
 
 
 def test_weaken_connection_retain(neuron_1: Neuron, neuron_2: Neuron):
-    strengthen_connection(neuron_1, neuron_2)
-    strengthen_connection(neuron_1, neuron_2)
-    weaken_connection(neuron_1, neuron_2)
+    strengthen_connection(neuron_1, neuron_2, 1, 4)
+    strengthen_connection(neuron_1, neuron_2, 1, 4)
+    weaken_connection(neuron_1, neuron_2, 1)
 
     assert neuron_2.position.index in neuron_1.post_synapses
     assert neuron_1.position.index in neuron_2.pre_synapses
@@ -60,8 +60,8 @@ def test_weaken_connection_retain(neuron_1: Neuron, neuron_2: Neuron):
 
 
 def test_weaken_connection_eliminate(neuron_1: Neuron, neuron_2: Neuron):
-    strengthen_connection(neuron_1, neuron_2)
-    weaken_connection(neuron_1, neuron_2)
+    strengthen_connection(neuron_1, neuron_2, 1, 4)
+    weaken_connection(neuron_1, neuron_2, 1)
 
     assert neuron_2.position.index not in neuron_1.post_synapses
     assert neuron_1.position.index not in neuron_2.pre_synapses

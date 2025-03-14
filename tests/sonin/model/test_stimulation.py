@@ -1,9 +1,9 @@
-import pytest
+from pytest import mark
 
 from sonin.model.stimulation import SnapBack
 
 
-@pytest.mark.parametrize(
+@mark.parametrize(
     'baseline, rate, scalar, initial, expected',
     [
         (0, 2, 1, 0, 0),

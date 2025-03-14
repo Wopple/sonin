@@ -31,11 +31,11 @@ from sonin.model.neuron import Neuron, TetanicPeriod
 #   - Connected neurons that fail to activate together weaken their connection over time.
 #   - Not all synapses exhibit this behavior.
 #
-#   - There are absolute and partial refactory periods. We may or may not need them though because one if their purposes
+#   + There are absolute and partial refactory periods. We may or may not need them though because one if their purposes
 #       is to ensure unidirectional activation along an axon which the code already enforces. It's still possible it has
 #       important behavioral implications.
 #
-#   - Neurons gradually return to their resting potential, both temporal and spatial summation can cause a neuron to
+#   + Neurons gradually return to their resting potential, both temporal and spatial summation can cause a neuron to
 #       fire.
 #
 #   - Some neurons activate for a long period of time based on changes in metabolism.

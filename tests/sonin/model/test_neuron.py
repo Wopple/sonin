@@ -1,9 +1,9 @@
-import pytest
+from pytest import mark
 
 from sonin.model.neuron import TetanicPeriod
 
 
-@pytest.mark.parametrize(
+@mark.parametrize(
     'threshold, activations, gap, num_steps, expected',
     [
         (2, 2, 0, 1, False),
