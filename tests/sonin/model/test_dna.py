@@ -16,7 +16,7 @@ from sonin.model.dna import Dna
         (5, 2, 3),
         (1, 3, 1),
         (2, 3, 2),
-    ]
+    ],
 )
 def test_dimension_size(min_neurons: int, n_dimension: int, expected: int):
     dna = Dna(
@@ -40,7 +40,7 @@ def test_dimension_size(min_neurons: int, n_dimension: int, expected: int):
         (5, 2, 9),
         (1, 3, 1),
         (2, 3, 8),
-    ]
+    ],
 )
 def test_n_neuron(min_neurons: int, n_dimension: int, expected: int):
     dna = Dna(

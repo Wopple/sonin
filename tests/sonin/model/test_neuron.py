@@ -29,7 +29,7 @@ from sonin.model.neuron import TetanicPeriod
         (2, 1, 1, 5, False),
         (2, 1, 1, 6, False),
         (2, 1, 1, 7, True),
-    ]
+    ],
 )
 def test_tetanic_period(threshold: int, activations: int, gap: int, num_steps: int, expected: bool):
     tetanic_period = TetanicPeriod(

@@ -95,6 +95,11 @@ from sonin.model.neuron import Neuron, TetanicPeriod
 #
 #   - There needs to be a way to make it unlikely to reform a disconnected synapse.
 
+# Tests
+#   - Weighted suite of tests
+#
+#   - Monkey test: resilient in the presence of change
+
 
 seed(0)
 
