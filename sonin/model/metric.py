@@ -22,6 +22,9 @@ class FrequencyProfile:
 
         self.last_time = c_time
 
+    def is_full(self) -> bool:
+        return len(self.deltas) == self.size
+
     @property
     def mean(self) -> int:
         if len(self.deltas) == 0:
@@ -31,6 +34,9 @@ class FrequencyProfile:
 
     @property
     def instability(self) -> int:
+        """
+        Sum of distance from the mean.
+        """
         mean = self.mean
 
         if mean == -1:
