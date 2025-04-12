@@ -1,11 +1,16 @@
-class Gear:
-    def __init__(self, up: int = 1, down: int = 1):
-        assert up >= 1
-        assert down >= 1
+from dataclasses import dataclass
 
-        self.up: int = up
-        self.down: int = down
-        self.current: int = 0
+
+@dataclass
+class Gear:
+    # Increases output speed
+    up: int
+
+    # Decreases output speed
+    down: int
+
+    # Stores the progress towards the next output
+    current: int = 0
 
     def __call__(self, x: int) -> int:
         total = self.current + x * self.up

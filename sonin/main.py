@@ -6,7 +6,11 @@ from sonin.model.neuron import Neuron, TetanicPeriod
 
 # Rules
 #   Conceptually, neurons and synapses are agents making decisions on their own based on interactions and environment.
-#   The mind is the programmatic engine that facilitates behavior.
+#   The mind is the programmatic engine that facilitates that behavior.
+#   Floats are 100% banned for performance critical code, even for intermediate values. This is to avoid floating
+#   point imprecision, and so specialized hardware does not require any circuitry for performing floating point math.
+#   Everything should use ints. I also do not see a need for strings, but strictly speaking they are not banned.
+#   Floats can only and strings should only exist outside the mind's interface.
 
 # Reading
 #   https://nba.uth.tmc.edu/neuroscience/m/s1/index.htm
@@ -93,13 +97,28 @@ from sonin.model.neuron import Neuron, TetanicPeriod
 #   - Elimination is the default process. Continuance occurs when a cell is provided nutrition.
 #   - Synapses retract from undernourished neurons.
 #
-#   - There needs to be a way to make it unlikely to reform a disconnected synapse.
+#   - There needs to be a way to make it unlikely to reform a disconnected synapse so it can try new paths.
+#
+#   - Most neurons rarely fire, many stay mostly dormant and then see rapid use when needed for a task.
+#
+#   - Axons can be any length.
 
 # Tests
 #   - Weighted suite of tests
 #
 #   - Monkey test: resilient in the presence of change
 
+# Model
+#   - Dependency Graph
+#     - Dna > Mutagen
+#     - Mutagen > Mutable Models
+#     - Mind > Hypercube
+#     - Mind > Neuron
+#     - Mind > Vector
+#     - Mind > Synapse
+#     - Neuron > Synapse
+#     - Synapse > Vector
+#     - Facilitation > Gear
 
 seed(0)
 
@@ -111,7 +130,18 @@ dna = Dna(
     max_neuron_strength=12,
 )
 
-mind = Mind(dna)
+mind = Mind(
+    n_synapse=dna.n_synapse,
+    n_dimension=dna.n_dimension,
+    dimension_size=dna.dimension_size,
+    max_neuron_strength=dna.max_neuron_strength,
+)
+
+mind.initialize(
+    activation_level=dna.activation_level,
+    refactory_period=dna.refactory_period,
+)
+
 mind.randomize_synapses()
 mind.randomize_potential()
 
@@ -133,7 +163,11 @@ def print_neurons(msg: str, neurons: list[Neuron]):
 def plot_synapses():
     import matplotlib.pyplot as plt
 
-    line_segments = [(s.pre_neuron.value, s.post_neuron.value) for n in mind.neurons.items for s in n.post_synapses.values()]
+    line_segments = [
+        (s.pre_neuron.value, s.post_neuron.value)
+        for n in mind.neurons.items
+        for s in n.post_synapses.values()
+    ]
 
     fig, ax = plt.subplots()
 

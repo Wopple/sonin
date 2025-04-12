@@ -20,7 +20,11 @@ from sonin.model.stimulation import SnapBack
     ],
 )
 def test_snap_back_step(baseline: int, rate: int, scalar: int, initial: int, expected: int):
-    snap_back = SnapBack(baseline, rate, scalar)
+    snap_back = SnapBack(
+        baseline=baseline,
+        restore_rate=rate,
+        restore_scalar=scalar,
+    )
 
     snap_back.value = initial
     snap_back.step()

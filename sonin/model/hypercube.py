@@ -1,53 +1,83 @@
+from dataclasses import dataclass, field
 from typing import Callable, Generator, Self
 
-from sonin.model.dna import Dna
 
+@dataclass
+class Vector:
+    # Size of each dimension
+    dimension_size: int
 
-class Position:
-    def __init__(self, dimension_size: int, value: tuple[int, ...]):
-        self.dimension_size: int = dimension_size
+    # Virtual path of indices to a neuron in the hypercube
+    value: tuple[int, ...]
 
-        # Virtual path of indices to a neuron in the hypercube
-        self.value: tuple[int, ...] = value
+    # Index of the position in the single dimensional representation of the hypercube
+    index: int = field(init=False)
 
-        # Index of the position in the single dimensional representation of the hypercube
-        self.index: int = sum(v * dimension_size ** i for i, v in enumerate(reversed(value)))
+    def __post_init__(self):
+        self.index = sum(v * self.dimension_size ** i for i, v in enumerate(reversed(self.value)))
 
     def grow(self, other: int) -> Self:
         """
         Grow the position by a single index
         """
-        return Position(self.dimension_size, self.value + (other,))
+        return Vector(self.dimension_size, self.value + (other,))
 
     def city_distance(self, other: Self) -> int:
         """
-        Integer based distance function
-        >>> Position(4, (1, 2)).city_distance(Position(4, (3, 0)))
+        Integer based distance function using city block distance
+        >>> Vector(4, (1, 2)).city_distance(Vector(4, (3, 0)))
         4
         """
         return sum(abs(a - b) for a, b in zip(self.value, other.value, strict=True))
 
+    def city_unit(self) -> Self:
+        """
+        Approximate algorithm for finding the city unit position that has the smallest
+        angle with the current position.
+        """
+        largest = max(abs(c) for c in self.value)
 
+        if largest == 0:
+            return Vector(
+                self.dimension_size,
+                tuple(0 for _ in range(len(self.value))),
+            )
+
+        # This algorithm will be close and usually correct, but not always.
+        # This algorithm can be improved if necessary by checking the adjacent
+        # positions or by doing a proper cosine similarity check.
+        def approximate_coordinate(c: int) -> int:
+            if largest - abs(c) <= largest // 2:
+                if c > 0:
+                    return 1
+                else:
+                    return -1
+            else:
+                return 0
+
+        return Vector(self.dimension_size, tuple(approximate_coordinate(c) for c in self.value))
+
+
+@dataclass
 class Hypercube[T]:
-    def __init__(self, dna: Dna):
-        self.n_dimension: int = dna.n_dimension
-        self.dimension_size: int = dna.dimension_size
-        self.items: list[T] = []
+    n_dimension: int
+    dimension_size: int
+    items: list[T] = field(default_factory=list)
 
     def __iter__(self):
         return iter(self.items)
 
-    def initialize(self, create_item: Callable[[Position], T]):
-        def create_items(n_dimension: int, position: Position) -> Generator[T, None, None]:
+    def initialize(self, create_item: Callable[[Vector], T]):
+        def create_items(n_dimension: int, position: Vector) -> Generator[T, None, None]:
             if n_dimension == 0:
                 yield create_item(position)
             else:
                 for p in range(self.dimension_size):
                     yield from create_items(n_dimension - 1, position.grow(p))
 
-        self.items = list(create_items(self.n_dimension, Position(self.dimension_size, ())))
+        self.items = list(create_items(self.n_dimension, Vector(self.dimension_size, ())))
 
-    def get(self, position: int | Position) -> T:
+    def get(self, position: int | Vector) -> T:
         if isinstance(position, int):
             return self.items[position]
         else:

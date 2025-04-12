@@ -1,19 +1,19 @@
+from dataclasses import dataclass, field
 from random import randint, choice
 
-from sonin.model.dna import Dna
-from sonin.model.hypercube import Hypercube, Position
+from sonin.model.hypercube import Hypercube, Vector
 from sonin.model.neuron import ACCEPTING, Neuron
 from sonin.model.synapse import Synapse
 
 
-def random_position(dna: Dna) -> Position:
-    return Position(dna.dimension_size, tuple(randint(0, dna.dimension_size - 1) for _ in range(dna.n_dimension)))
+def random_position(n_dimension: int, dimension_size: int) -> Vector:
+    return Vector(dimension_size, tuple(randint(0, dimension_size - 1) for _ in range(n_dimension)))
 
 
 def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int, max_strength: int):
-    pre_position: Position = pre_neuron.position
+    pre_position: Vector = pre_neuron.position
     pre_index: int = pre_position.index
-    post_position: Position = post_neuron.position
+    post_position: Vector = post_neuron.position
     post_index: int = post_position.index
     synapse: Synapse
 
@@ -33,9 +33,9 @@ def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int
 
 
 def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int):
-    pre_position: Position = pre_neuron.position
+    pre_position: Vector = pre_neuron.position
     pre_index: int = pre_position.index
-    post_position: Position = post_neuron.position
+    post_position: Vector = post_neuron.position
     post_index: int = post_position.index
     synapse: Synapse
 
@@ -49,28 +49,46 @@ def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int):
             del post_neuron.pre_synapses[pre_index]
 
 
+@dataclass
 class Mind:
-    def __init__(self, dna: Dna):
-        self.dna: Dna = dna
-        self.neurons: Hypercube[Neuron] = Hypercube(dna)
-        self.neurons.initialize(lambda position: Neuron(dna, position))
+    n_synapse: int
+    n_dimension: int
+    dimension_size: int
+    max_neuron_strength: int
+    neurons: Hypercube[Neuron] = field(init=False)
+
+    def __post_init__(self):
+        self.neurons = Hypercube(
+            n_dimension=self.n_dimension,
+            dimension_size=self.dimension_size,
+        )
+
+    def initialize(self, activation_level: int, refactory_period: int):
+        self.neurons.initialize(lambda position: Neuron(
+            position=position,
+            activation_level=activation_level,
+            refactory_period=refactory_period,
+        ))
 
     def randomize_synapses(self):
         for pre_n in self.neurons:
-            for i in range(self.dna.n_synapse):
-                post_n = self.neurons.get(random_position(self.dna))
+            for i in range(self.n_synapse):
+                post_n = self.neurons.get(random_position(
+                    n_dimension=self.n_dimension,
+                    dimension_size=self.dimension_size,
+                ))
 
                 strengthen_connection(
                     pre_neuron=pre_n,
                     post_neuron=post_n,
-                    strength=self.dna.max_neuron_strength // 2,
-                    max_strength=self.dna.max_neuron_strength,
+                    strength=self.max_neuron_strength // 2,
+                    max_strength=self.max_neuron_strength,
                 )
 
     def randomize_potential(self):
         for n in self.neurons:
             if randint(0, 1):
-                n.potential = self.dna.activation_level
+                n.potential = n.activation_level
             else:
                 n.potential = 0
 
@@ -87,7 +105,7 @@ class Mind:
                 weaken_connection(
                     pre_neuron=self.neurons.get(syn.pre_neuron),
                     post_neuron=n,
-                    strength=self.dna.max_neuron_strength // 2,
+                    strength=self.max_neuron_strength // 2,
                 )
 
         for n in self.neurons:

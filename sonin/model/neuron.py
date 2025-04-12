@@ -1,5 +1,7 @@
-from sonin.model.dna import Dna
-from sonin.model.hypercube import Position
+from dataclasses import dataclass, field, InitVar
+from typing import Self
+
+from sonin.model.hypercube import Vector
 from sonin.model.stimulation import SnapBack
 from sonin.model.synapse import Synapse
 
@@ -9,37 +11,49 @@ ACCEPTING = 'accepting'
 # Will reject potential from pre-synaptic neurons
 REFACTORY = 'refactory'
 
+
+@dataclass
 class TetanicPeriod:
-    def __init__(self, threshold: int, activations: int, gap: int):
-        # Number of steps to begin tetanic activation
-        self.threshold: int = threshold
+    # Number of steps to begin tetanic activation
+    threshold: int
 
-        # Number of activations in each tetanus
-        self.activations: int = activations
+    # Number of activations in each tetanus
+    activations: int
 
-        # Number of steps between activations during tetanus
-        self.gap: int = gap
+    # Number of steps between activations during tetanus
+    gap: int
 
-        # True if dormant, False if within tetanus
-        self.dormant: bool = True
+    # True if dormant, False if within tetanus
+    _dormant: bool = field(init=False)
 
-        # Time of next flip between dormant and tetanus
-        self.n_time: int = threshold
+    # Time of next flip between dormant and tetanus
+    _n_time: int = field(init=False)
+
+    def __post_init__(self):
+        self._dormant: bool = True
+        self._n_time: int = self.threshold
 
     def step(self, c_time: int):
-        if self.dormant:
-            if c_time >= self.n_time:
-                self.dormant = False
-                self.n_time = c_time + self.activations * (self.gap + 1)
+        if self._dormant:
+            if c_time >= self._n_time:
+                self._dormant = False
+                self._n_time = c_time + self.activations * (self.gap + 1)
         else:
-            if c_time >= self.n_time:
-                self.dormant = True
-                self.n_time = c_time + self.threshold
+            if c_time >= self._n_time:
+                self._dormant = True
+                self._n_time = c_time + self.threshold
 
     def is_active(self, c_time) -> bool:
-        return not self.dormant and (self.n_time - c_time) % (self.gap + 1) == 0
+        return not self._dormant and (self._n_time - c_time) % (self.gap + 1) == 0
+
 
 class NullTetanicPeriod(TetanicPeriod):
+    def __new__(cls, *args, **kwargs) -> Self:
+        if not hasattr(cls, "instance"):
+            cls.instance: NullTetanicPeriod = super().__new__(cls)
+
+        return cls.instance
+
     def __init__(self):
         pass
 
@@ -49,46 +63,57 @@ class NullTetanicPeriod(TetanicPeriod):
     def is_active(self, _c_time) -> bool:
         return False
 
+
+@dataclass
 class Neuron:
-    def __init__(
+    # Vector of the neuron in the mind
+    position: Vector
+
+    # True if the neuron excites other neurons, False if it inhibits other neurons
+    excites: bool = True
+
+    # Current activation potential of the neuron
+    potential: int = 0
+
+    # Potential threshold for activation
+    activation_level: int = 1
+
+    # Number of dormant steps after activation
+    refactory_period: int = 0
+
+    # Periodic activations without need for input potential
+    tetanic_period: TetanicPeriod = field(default_factory=lambda: NullTetanicPeriod())
+
+    # Synapses connected to post neurons (output)
+    post_synapses: dict[int, Synapse] = field(default_factory=dict)
+
+    # Synapses connected to pre neurons (input)
+    pre_synapses: dict[int, Synapse] = field(default_factory=dict)
+
+    # Current state of the neuron
+    state: str = ACCEPTING
+
+    # If True, will send potential to post-synaptic neurons
+    activated: bool = False
+
+    # Time at which to reactivate the neuron
+    t_refactory_end: int = 0
+
+    stimulation: SnapBack = field(init=False)
+    stimulation_amount: int = 64
+    stimulation_restore_rate: InitVar[int] = 8
+    stimulation_restore_scalar: InitVar[int] = 7
+
+    def __post_init__(
         self,
-        dna: Dna,
-        position: Position,
-        excites: bool = True,
-        tetanic_period: TetanicPeriod = NullTetanicPeriod(),
+        stimulation_restore_rate: int,
+        stimulation_restore_scalar: int,
     ):
-        self.dna: Dna = dna
-
-        # Position of the neuron in the mind
-        self.position: Position = position
-
-        # True if the neuron excites other neurons, False if it inhibits other neurons
-        self.excites: bool = excites
-
-        self.tetanic_period: TetanicPeriod = tetanic_period
-
-        # Synapses connected to post neurons (output)
-        self.post_synapses: dict[int, Synapse] = {}
-
-        # Synapses connected to pre neurons (input)
-        self.pre_synapses: dict[int, Synapse] = {}
-
-        # Current activation potential of the neuron
-        self._potential: int = 0
-
-        # Current state of the neuron
-        self.state: str = ACCEPTING
-
-        # If True, will send potential to post-synaptic neurons
-        self.activated: bool = False
-
-        # Time at which to reactivate the neuron
-        self.t_refactory_end: int = 0
-
         # Detects frequent activations
-        self.stimulation = SnapBack(restore_rate=8, restore_scalar=7)
-
-        self.initialize()
+        self.stimulation = SnapBack(
+            restore_rate=stimulation_restore_rate,
+            restore_scalar=stimulation_restore_scalar,
+        )
 
     @property
     def inhibits(self) -> bool:
@@ -102,16 +127,12 @@ class Neuron:
     def potential(self, potential):
         self._potential = potential
 
-    def initialize(self):
-        self.potential = 0
-        self.state = ACCEPTING
-
     def step(self, c_time: int):
         self.stimulation.step()
         self.tetanic_period.step(c_time)
 
         if self.state == ACCEPTING:
-            if self.potential >= self.dna.activation_level or self.tetanic_period.is_active(c_time):
+            if self.potential >= self.activation_level or self.tetanic_period.is_active(c_time):
                 self.activate(c_time)
         elif self.state == REFACTORY and c_time >= self.t_refactory_end:
             self.enable()
@@ -120,13 +141,40 @@ class Neuron:
         self.state = ACCEPTING
 
     def activate(self, c_time: int):
-        self.stimulation.value += 64
+        self.stimulation.value += self.stimulation_amount
         self.potential = 0
         self.activated = True
 
-        if self.dna.refactory_period > 0:
+        if self.refactory_period > 0:
             self.state = REFACTORY
-            self.t_refactory_end = c_time + self.dna.refactory_period
+            self.t_refactory_end = c_time + self.refactory_period
 
     def deactivate(self):
         self.activated = False
+
+
+@dataclass
+class Axon:
+    position: Vector
+    n_dimension: InitVar[int]
+    dimension_size: InitVar[int]
+    direction: list[int] = field(default_factory=list)
+
+    def __post_init__(self, n_dimension: int, dimension_size: int):
+        # All axons start out pointing at the center. This helps differentiate
+        # neurons and expose them to the most signals.
+
+        self.direction = []
+
+        for i in range(n_dimension):
+            # Not halving the dimension_size because int division will not capture a center between points
+            double = self.position.value[i] * 2
+
+            if double < dimension_size:
+                self.direction.append(-1)
+            elif double > dimension_size:
+                self.direction.append(1)
+            else:
+                self.direction.append(0)
+
+        assert len(self.direction) == n_dimension
