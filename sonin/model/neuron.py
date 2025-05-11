@@ -3,6 +3,7 @@ from typing import Self
 
 from sonin.model.hypercube import Vector
 from sonin.model.stimulation import SnapBack
+from sonin.model.signal import Signal
 from sonin.model.synapse import Synapse
 
 # Will accept potential from pre-synaptic neurons
@@ -65,9 +66,45 @@ class NullTetanicPeriod(TetanicPeriod):
 
 
 @dataclass
+class Axon:
+    position: Vector
+    n_dimension: InitVar[int]
+    dimension_size: InitVar[int]
+    signals: set[Signal] = field(default_factory=set)
+    direction: Vector = field(init=False)
+
+    def __post_init__(self, n_dimension: int, dimension_size: int):
+        # All axons start out pointing at the center. This helps differentiate
+        # neurons and expose them to the most signals.
+
+        direction = ()
+
+        for i in range(n_dimension):
+            # Not halving the dimension_size because int division will not capture a center between points
+            double = self.position.value[i] * 2
+
+            if double < dimension_size:
+                direction += (-1,)
+            elif double > dimension_size:
+                direction += (1,)
+            else:
+                direction += (0,)
+
+        assert len(direction) == n_dimension
+
+        self.direction = Vector(dimension_size, direction)
+
+
+@dataclass
 class Neuron:
     # Vector of the neuron in the mind
     position: Vector
+
+    # Determines where synaptic connections can be made
+    axon: Axon
+
+    # The signals this neuron emits
+    signals: set[Signal] = field(default_factory=set)
 
     # True if the neuron excites other neurons, False if it inhibits other neurons
     excites: bool = True
@@ -151,30 +188,3 @@ class Neuron:
 
     def deactivate(self):
         self.activated = False
-
-
-@dataclass
-class Axon:
-    position: Vector
-    n_dimension: InitVar[int]
-    dimension_size: InitVar[int]
-    direction: list[int] = field(default_factory=list)
-
-    def __post_init__(self, n_dimension: int, dimension_size: int):
-        # All axons start out pointing at the center. This helps differentiate
-        # neurons and expose them to the most signals.
-
-        self.direction = []
-
-        for i in range(n_dimension):
-            # Not halving the dimension_size because int division will not capture a center between points
-            double = self.position.value[i] * 2
-
-            if double < dimension_size:
-                self.direction.append(-1)
-            elif double > dimension_size:
-                self.direction.append(1)
-            else:
-                self.direction.append(0)
-
-        assert len(self.direction) == n_dimension

@@ -2,7 +2,8 @@ from dataclasses import dataclass, field
 from random import randint, choice
 
 from sonin.model.hypercube import Hypercube, Vector
-from sonin.model.neuron import ACCEPTING, Neuron
+from sonin.model.neuron import ACCEPTING, Neuron, Axon
+from sonin.model.signal import SignalProfile
 from sonin.model.synapse import Synapse
 
 
@@ -56,6 +57,7 @@ class Mind:
     dimension_size: int
     max_neuron_strength: int
     neurons: Hypercube[Neuron] = field(init=False)
+    signal_profile: SignalProfile = field(default_factory=SignalProfile)
 
     def __post_init__(self):
         self.neurons = Hypercube(
@@ -66,9 +68,12 @@ class Mind:
     def initialize(self, activation_level: int, refactory_period: int):
         self.neurons.initialize(lambda position: Neuron(
             position=position,
+            axon=Axon(position, self.n_dimension, self.dimension_size),
             activation_level=activation_level,
             refactory_period=refactory_period,
         ))
+
+        self.guide_axons()
 
     def randomize_synapses(self):
         for pre_n in self.neurons:
@@ -92,8 +97,39 @@ class Mind:
             else:
                 n.potential = 0
 
+    def guide_axons(self):
+        all_signals = [(s, n.position) for n in self.neurons for s in n.signals]
+
+        for n in self.neurons:
+            axon = n.axon
+            position = axon.position
+            guide_signals = axon.signals
+
+            # Stop if trying to move to a past position.
+            past_positions = set()
+
+            direction = axon.direction
+
+            while position not in past_positions:
+                past_positions.add(position)
+                v_attraction = Vector(self.dimension_size, tuple(0 for _ in range(self.n_dimension)))
+
+                for effect_signal, location in all_signals:
+                    for guide_signal in guide_signals:
+                        attraction = self.signal_profile.attraction(guide_signal, effect_signal)
+                        v_attraction += (location - position) * attraction // position.city_distance(location)
+
+                # Stop if the net attraction is zero
+                if all(c == 0 for c in v_attraction.value):
+                    break
+
+                direction = (direction + v_attraction).city_unit()
+                position = (position + direction).clip()
+
+            axon.position = position
+
     def step(self, c_time: int):
-        # Iterate multiple times to prevent iteration significance
+        # Iterate multiple times to prevent reading from data being written to
 
         for n in self.neurons:
             n.step(c_time)

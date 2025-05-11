@@ -3,7 +3,7 @@ from pytest import fixture
 from sonin.model.dna import Dna
 from sonin.model.hypercube import Vector
 from sonin.model.mind import strengthen_connection, weaken_connection
-from sonin.model.neuron import Neuron
+from sonin.model.neuron import Neuron, Axon
 
 
 @fixture
@@ -18,8 +18,11 @@ def dna(n_dimension: int) -> Dna:
 
 @fixture
 def neuron_1(dna: Dna) -> Neuron:
+    position = Vector(dna.n_dimension, (0,))
+
     return Neuron(
-        position=Vector(dna.n_dimension, (0,)),
+        position=position,
+        axon=Axon(position, dna.n_dimension, dna.dimension_size),
         activation_level=dna.activation_level,
         refactory_period=dna.refactory_period,
     )
@@ -27,8 +30,11 @@ def neuron_1(dna: Dna) -> Neuron:
 
 @fixture
 def neuron_2(dna: Dna) -> Neuron:
+    position = Vector(dna.n_dimension, (1,))
+
     return Neuron(
-        position=Vector(dna.n_dimension, (1,)),
+        position=position,
+        axon=Axon(position, dna.n_dimension, dna.dimension_size),
         activation_level=dna.activation_level,
         refactory_period=dna.refactory_period,
     )

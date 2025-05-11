@@ -16,6 +16,62 @@ class Vector:
     def __post_init__(self):
         self.index = sum(v * self.dimension_size ** i for i, v in enumerate(reversed(self.value)))
 
+    @property
+    def n_dimension(self) -> int:
+        return len(self.value)
+
+    def __eq__(self, other: Self):
+        return self.index == other.index
+
+    def __ne__(self, other: Self):
+        return not self.__eq__(other)
+
+    def __hash__(self) -> int:
+        return self.index
+
+    def __add__(self, other: Self) -> Self:
+        assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
+
+        return Vector(
+            self.dimension_size,
+            tuple(self.value[idx] + other.value[idx] for idx in range(self.n_dimension)),
+        )
+
+    def __sub__(self, other: Self) -> Self:
+        assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
+
+        return Vector(
+            self.dimension_size,
+            tuple(self.value[idx] - other.value[idx] for idx in range(self.n_dimension)),
+        )
+
+    def __mul__(self, other) -> Self:
+        if isinstance(other, int):
+            return Vector(
+                self.dimension_size,
+                tuple(v * other for v in self.value),
+            )
+        elif isinstance(other, Vector):
+            assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
+
+            return sum(self.value[idx] * other.value[idx] for idx in range(self.n_dimension))
+        else:
+            raise TypeError(f"Vector.__mul__: unexpected type: {other}")
+
+    def clip(self) -> Self:
+        def clip(value: int, lower: int, upper: int) -> int:
+            if value < lower:
+                return lower
+            elif value >= upper:
+                return self.dimension_size - 1
+            else:
+                return value
+
+        return Vector(
+            self.dimension_size,
+            tuple(clip(v, 0, self.dimension_size) for v in self.value),
+        )
+
     def grow(self, other: int) -> Self:
         """
         Grow the position by a single index
@@ -32,22 +88,22 @@ class Vector:
 
     def city_unit(self) -> Self:
         """
-        Approximate algorithm for finding the city unit position that has the smallest
-        angle with the current position.
+        Approximate algorithm for finding the city unit vector that has the smallest
+        angle with the current vector.
         """
         largest = max(abs(c) for c in self.value)
 
         if largest == 0:
             return Vector(
                 self.dimension_size,
-                tuple(0 for _ in range(len(self.value))),
+                tuple(0 for _ in range(self.n_dimension)),
             )
 
         # This algorithm will be close and usually correct, but not always.
         # This algorithm can be improved if necessary by checking the adjacent
         # positions or by doing a proper cosine similarity check.
         def approximate_coordinate(c: int) -> int:
-            if largest - abs(c) <= largest // 2:
+            if abs(c) >= largest // 2:
                 if c > 0:
                     return 1
                 else:

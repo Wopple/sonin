@@ -17,6 +17,7 @@ from sonin.model.neuron import Neuron, TetanicPeriod
 #   https://pmc.ncbi.nlm.nih.gov/articles/PMC8186004/
 #   https://pmc.ncbi.nlm.nih.gov/articles/PMC4743082/
 #   https://biology.kenyon.edu/courses/biol114/Chap11/Chapter_11.html
+#   https://www.science.org/doi/10.1126/science.aax6239
 
 # Features
 #   + Neurons can be excitatory or inhibitory.

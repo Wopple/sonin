@@ -1,14 +1,21 @@
+from dataclasses import dataclass, field
+
+# Identifies a signal
 type Signal = int
+
+# How much of a signal a neuron is exposed to. Affects fate determination.
 type Level = int
+
+# Degree of attraction between signals. Negative values are repulsive.
 type Affinity = int
+
+# The affinities of the top level signals to the inner signals
 type AffinityDict = dict[Signal, dict[Signal, Affinity]]
 
 
+@dataclass
 class SignalProfile:
-    def __init__(self, affinities: AffinityDict):
-        # A signal is identified by an integer. The affinity maps a signal to how attracted it is to
-        # other signals. A negative attractive effect is a repulsive effect.
-        self.affinities: AffinityDict = affinities
+    affinities: AffinityDict = field(default_factory=dict)
 
     def attraction(self, this_signal: Signal, that_signal: Signal) -> Affinity:
         attraction = self.affinities.get(this_signal)
