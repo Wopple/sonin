@@ -1,4 +1,6 @@
 # Record behavior to make functional decisions and improve developer insight
+from sonin.model.math import div
+
 
 class FrequencyProfile:
     def __init__(self, size: int):
@@ -30,7 +32,7 @@ class FrequencyProfile:
         if len(self.deltas) == 0:
             return -1
 
-        return sum(self.deltas) // len(self.deltas)
+        return div(sum(self.deltas), len(self.deltas))
 
     @property
     def instability(self) -> int:

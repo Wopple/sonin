@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from sonin.model.math import div
+
 
 @dataclass
 class Gear:
@@ -15,4 +17,4 @@ class Gear:
     def __call__(self, x: int) -> int:
         total = self.current + x * self.up
         self.current = total % self.down
-        return total // self.down
+        return div(total, self.down)

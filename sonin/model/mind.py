@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from random import randint, choice
 
 from sonin.model.hypercube import Hypercube, Vector
+from sonin.model.math import div
 from sonin.model.neuron import ACCEPTING, Neuron, Axon
 from sonin.model.signal import SignalProfile
 from sonin.model.synapse import Synapse
@@ -86,7 +87,7 @@ class Mind:
                 strengthen_connection(
                     pre_neuron=pre_n,
                     post_neuron=post_n,
-                    strength=self.max_neuron_strength // 2,
+                    strength=div(self.max_neuron_strength, 2),
                     max_strength=self.max_neuron_strength,
                 )
 
@@ -104,26 +105,28 @@ class Mind:
             axon = n.axon
             position = axon.position
             guide_signals = axon.signals
-
-            # Stop if trying to move to a past position.
             past_positions = set()
-
             direction = axon.direction
 
+            # Stop if trying to move to a past position
             while position not in past_positions:
                 past_positions.add(position)
-                v_attraction = Vector(self.dimension_size, tuple(0 for _ in range(self.n_dimension)))
+                attraction = Vector(self.dimension_size, tuple(0 for _ in range(self.n_dimension)))
 
+                # Sum the attractive effects between the signals
                 for effect_signal, location in all_signals:
                     for guide_signal in guide_signals:
-                        attraction = self.signal_profile.attraction(guide_signal, effect_signal)
-                        v_attraction += (location - position) * attraction // position.city_distance(location)
+                        degree_of_attraction = self.signal_profile.attraction(guide_signal, effect_signal)
+                        attraction += div((location - position) * degree_of_attraction, position.city_distance(location))
 
                 # Stop if the net attraction is zero
-                if all(c == 0 for c in v_attraction.value):
+                if all(c == 0 for c in attraction.value):
                     break
 
-                direction = (direction + v_attraction).city_unit()
+                # Let the previous direction affect the new direction
+                direction = (direction + attraction).city_unit()
+
+                # Move the axon clipping to the hypercube size
                 position = (position + direction).clip()
 
             axon.position = position
@@ -141,7 +144,7 @@ class Mind:
                 weaken_connection(
                     pre_neuron=self.neurons.get(syn.pre_neuron),
                     post_neuron=n,
-                    strength=self.max_neuron_strength // 2,
+                    strength=div(self.max_neuron_strength, 2),
                 )
 
         for n in self.neurons:

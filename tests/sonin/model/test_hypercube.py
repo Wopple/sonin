@@ -7,7 +7,7 @@ DIMENSION_SIZE = 50
 
 
 @mark.parametrize(
-    "a, b, c",
+    "a, b, expected",
     [
         ((0,), (0,), (0,)),
         ((1,), (0,), (1,)),
@@ -17,18 +17,18 @@ DIMENSION_SIZE = 50
         ((-1,), (1,), (0,)),
         ((-1,), (-1,), (-2,)),
         ((1, 2), (3, 4), (4, 6)),
-    ]
+    ],
 )
-def test_add(a: tuple[int, ...], b: tuple[int, ...], c: tuple[int, ...]):
-    av = Vector(DIMENSION_SIZE, a)
-    bv = Vector(DIMENSION_SIZE, b)
-    expected = Vector(DIMENSION_SIZE, c)
+def test_add(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
+    v_a = Vector(DIMENSION_SIZE, a)
+    v_b = Vector(DIMENSION_SIZE, b)
+    v_expected = Vector(DIMENSION_SIZE, expected)
 
-    assert av + bv == expected
+    assert v_a + v_b == v_expected
 
 
 @mark.parametrize(
-    "a, b, c",
+    "a, b, expected",
     [
         ((0,), (0,), (0,)),
         ((1,), (0,), (1,)),
@@ -38,14 +38,35 @@ def test_add(a: tuple[int, ...], b: tuple[int, ...], c: tuple[int, ...]):
         ((-1,), (1,), (-2,)),
         ((-1,), (-1,), (0,)),
         ((1, 2), (3, 4), (-2, -2)),
-    ]
+    ],
 )
-def test_sub(a: tuple[int, ...], b: tuple[int, ...], c: tuple[int, ...]):
-    av = Vector(DIMENSION_SIZE, a)
-    bv = Vector(DIMENSION_SIZE, b)
-    expected = Vector(DIMENSION_SIZE, c)
+def test_sub(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
+    v_a = Vector(DIMENSION_SIZE, a)
+    v_b = Vector(DIMENSION_SIZE, b)
+    v_expected = Vector(DIMENSION_SIZE, expected)
 
-    assert av - bv == expected
+    assert v_a - v_b == v_expected
+
+
+@mark.parametrize(
+    "a, b, expected",
+    [
+        ((0,), 0, (0,)),
+        ((1,), 0, (0,)),
+        ((0,), 1, (0,)),
+        ((1,), 1, (1,)),
+        ((1,), -1, (-1,)),
+        ((-1,), -1, (1,)),
+        ((2,), 3, (6,)),
+        ((-3,), 2, (-6,)),
+        ((1, 2), 3, (3, 6)),
+    ],
+)
+def test_mul(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
+    v_a = Vector(DIMENSION_SIZE, a)
+    v_expected = Vector(DIMENSION_SIZE, expected)
+
+    assert v_a * b == v_expected
 
 
 @mark.parametrize(
@@ -59,13 +80,35 @@ def test_sub(a: tuple[int, ...], b: tuple[int, ...], c: tuple[int, ...]):
         ((-1,), (1,), -1),
         ((1, 1), (-1, -1), -2),
         ((1, 2), (3, 4), 11),
-    ]
+    ],
 )
 def test_dot_product(a: tuple[int, ...], b: tuple[int, ...], expected: int):
-    av = Vector(DIMENSION_SIZE, a)
-    bv = Vector(DIMENSION_SIZE, b)
+    v_a = Vector(DIMENSION_SIZE, a)
+    v_b = Vector(DIMENSION_SIZE, b)
 
-    assert av * bv == expected
+    assert v_a * v_b == expected
+
+
+@mark.parametrize(
+    "a, b, expected",
+    [
+        ((0,), 1, (0,)),
+        ((1,), 1, (1,)),
+        ((2,), 1, (2,)),
+        ((3,), 2, (1,)),
+        ((4,), 2, (2,)),
+        ((-4,), 2, (-2,)),
+        ((4,), -2, (-2,)),
+        ((2,), 3, (0,)),
+        ((-3,), 2, (-1,)),
+        ((3, 6), 3, (1, 2)),
+    ],
+)
+def test_div(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
+    v_a = Vector(DIMENSION_SIZE, a)
+    v_expected = Vector(DIMENSION_SIZE, expected)
+
+    assert v_a / b == v_expected
 
 
 @mark.parametrize(
@@ -96,7 +139,7 @@ def test_dot_product(a: tuple[int, ...], b: tuple[int, ...], expected: int):
         ((10, 5, -5), (1, 1, -1)),
         ((4, 10, -5), (0, 1, -1)),
         ((5, 10, -5), (1, 1, -1)),
-    ]
+    ],
 )
 def test_city_unit(before: tuple[int, ...], expected: tuple[int, ...]):
     actual = Vector(DIMENSION_SIZE, before).city_unit().value

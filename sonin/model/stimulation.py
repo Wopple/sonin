@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+from sonin.model.math import div
+
 
 @dataclass
 class SnapBack:
@@ -36,7 +38,7 @@ class SnapBack:
 
     def step(self):
         if self._value > 0:
-            self._value = self._value * self.restore_scalar // self.restore_rate
+            self._value = div(self._value * self.restore_scalar, self.restore_rate)
         elif self._value < 0:
             positive = -self._value
-            self._value = -(positive * self.restore_scalar // self.restore_rate)
+            self._value = -(div(positive * self.restore_scalar, self.restore_rate))

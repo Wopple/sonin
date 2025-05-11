@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Callable, Generator, Self
 
+from sonin.model.math import div
+
 
 @dataclass
 class Vector:
@@ -29,23 +31,45 @@ class Vector:
     def __hash__(self) -> int:
         return self.index
 
-    def __add__(self, other: Self) -> Self:
-        assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
+    def __add__(self, other: int | Self) -> Self:
+        if isinstance(other, int):
+            return Vector(
+                self.dimension_size,
+                tuple(v + other for v in self.value),
+            )
+        elif isinstance(other, Vector):
+            assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
 
-        return Vector(
-            self.dimension_size,
-            tuple(self.value[idx] + other.value[idx] for idx in range(self.n_dimension)),
-        )
+            return Vector(
+                self.dimension_size,
+                tuple(self.value[idx] + other.value[idx] for idx in range(self.n_dimension)),
+            )
+        else:
+            raise TypeError(f"Vector.__add__: unexpected type: {other}")
 
-    def __sub__(self, other: Self) -> Self:
-        assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
+    def __radd__(self, other: int) -> Self:
+        return self + other
 
-        return Vector(
-            self.dimension_size,
-            tuple(self.value[idx] - other.value[idx] for idx in range(self.n_dimension)),
-        )
+    def __sub__(self, other: int | Self) -> Self:
+        if isinstance(other, int):
+            return Vector(
+                self.dimension_size,
+                tuple(v - other for v in self.value),
+            )
+        elif isinstance(other, Vector):
+            assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
 
-    def __mul__(self, other) -> Self:
+            return Vector(
+                self.dimension_size,
+                tuple(self.value[idx] - other.value[idx] for idx in range(self.n_dimension)),
+            )
+        else:
+            raise TypeError(f"Vector.__mul__: unexpected type: {other}")
+
+    def __rsub__(self, other: int) -> Self:
+        return self - other
+
+    def __mul__(self, other: int | Self) -> int | Self:
         if isinstance(other, int):
             return Vector(
                 self.dimension_size,
@@ -57,6 +81,18 @@ class Vector:
             return sum(self.value[idx] * other.value[idx] for idx in range(self.n_dimension))
         else:
             raise TypeError(f"Vector.__mul__: unexpected type: {other}")
+
+    def __rmul__(self, other: int) -> Self:
+        return self * other
+
+    def __truediv__(self, other: int) -> Self:
+        return Vector(
+            self.dimension_size,
+            tuple(div(v, other) for v in self.value),
+        )
+
+    def __rtruediv__(self, other: int) -> Self:
+        return self / other
 
     def clip(self) -> Self:
         def clip(value: int, lower: int, upper: int) -> int:
@@ -103,7 +139,7 @@ class Vector:
         # This algorithm can be improved if necessary by checking the adjacent
         # positions or by doing a proper cosine similarity check.
         def approximate_coordinate(c: int) -> int:
-            if abs(c) >= largest // 2:
+            if abs(c) >= div(largest, 2):
                 if c > 0:
                     return 1
                 else:
