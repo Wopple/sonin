@@ -129,6 +129,7 @@ dna = Dna(
     n_dimension=2,
     activation_level=24,
     max_neuron_strength=12,
+    axon_range=2,
 )
 
 mind = Mind(
@@ -136,6 +137,7 @@ mind = Mind(
     n_dimension=dna.n_dimension,
     dimension_size=dna.dimension_size,
     max_neuron_strength=dna.max_neuron_strength,
+    axon_range=dna.axon_range,
 )
 
 mind.initialize(

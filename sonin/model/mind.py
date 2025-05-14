@@ -53,6 +53,7 @@ class Mind:
     n_dimension: int
     dimension_size: int
     max_neuron_strength: int
+    axon_range: int
     neurons: Hypercube[Neuron] = field(init=False)
     signal_profile: SignalProfile = field(default_factory=SignalProfile)
 
@@ -72,7 +73,7 @@ class Mind:
 
         self.guide_axons()
 
-    def random_position(self, center: Vector, distance: int = 2) -> Vector:
+    def random_position(self, center: Vector, distance: int) -> Vector:
         """
         Returns a vector within `distance` city blocks from the center wrapping at the dimension size.
         """
@@ -84,7 +85,7 @@ class Mind:
     def randomize_synapses(self):
         for pre_n in self.neurons:
             for i in range(self.n_synapse):
-                post_n = self.neurons.get(self.random_position(pre_n.axon.position))
+                post_n = self.neurons.get(self.random_position(pre_n.axon.position, self.axon_range))
 
                 strengthen_connection(
                     pre_neuron=pre_n,

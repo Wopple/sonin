@@ -9,6 +9,7 @@ class Dna:
         n_dimension: int = 1,
         activation_level: int = 1,
         max_neuron_strength: int = 1,
+        axon_range: int = 1,
         refactory_period: int = 0,
         facilitation_granularity: int = 1,
         facilitation_limit: int = 1,
@@ -27,6 +28,9 @@ class Dna:
 
         # Neurons cannot propagate more potential than this when activating
         self._max_neuron_strength: UintMutagen = UintMutagen(max_neuron_strength, 1)
+
+        # Neurons cannot propagate more potential than this when activating
+        self._axon_range: UintMutagen = UintMutagen(axon_range, 1)
 
         # Amount of time a neuron stays in the refactory state (min 1)
         self._refactory_period: UintMutagen = UintMutagen(refactory_period)
@@ -80,6 +84,10 @@ class Dna:
     @property
     def max_neuron_strength(self) -> int:
         return self._max_neuron_strength.value
+
+    @property
+    def axon_range(self) -> int:
+        return self._axon_range.value
 
     @property
     def refactory_period(self) -> int:
