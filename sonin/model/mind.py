@@ -8,10 +8,6 @@ from sonin.model.signal import SignalProfile
 from sonin.model.synapse import Synapse
 
 
-def random_position(n_dimension: int, dimension_size: int) -> Vector:
-    return Vector(dimension_size, tuple(randint(0, dimension_size - 1) for _ in range(n_dimension)))
-
-
 def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int, max_strength: int):
     pre_position: Vector = pre_neuron.position
     pre_index: int = pre_position.index
@@ -76,13 +72,19 @@ class Mind:
 
         self.guide_axons()
 
+    def random_position(self, center: Vector, distance: int = 2) -> Vector:
+        """
+        Returns a vector within `distance` city blocks from the center wrapping at the dimension size.
+        """
+        def random_component(idx: int) -> int:
+            return (center.value[idx] + randint(-distance, distance)) % self.dimension_size
+
+        return Vector(self.dimension_size, tuple(random_component(idx) for idx in range(self.n_dimension)))
+
     def randomize_synapses(self):
         for pre_n in self.neurons:
             for i in range(self.n_synapse):
-                post_n = self.neurons.get(random_position(
-                    n_dimension=self.n_dimension,
-                    dimension_size=self.dimension_size,
-                ))
+                post_n = self.neurons.get(self.random_position(pre_n.axon.position))
 
                 strengthen_connection(
                     pre_neuron=pre_n,
@@ -132,7 +134,8 @@ class Mind:
             axon.position = position
 
     def step(self, c_time: int):
-        # Iterate multiple times to prevent reading from data being written to
+        # Iterate multiple times so always writing to data not being read from.
+        # This makes the algorithm trivial to parallelize.
 
         for n in self.neurons:
             n.step(c_time)
