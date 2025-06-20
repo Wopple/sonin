@@ -102,25 +102,31 @@ class Mind:
                 n.potential = 0
 
     def guide_axons(self):
-        all_signals = [(s, n.position) for n in self.neurons for s in n.signals]
+        all_signals = [(signal, n.position, range) for n in self.neurons for signal, range in n.signals.items()]
 
         for n in self.neurons:
             axon = n.axon
-            position = axon.position
-            guide_signals = axon.signals
+            axon_position = axon.position
+            growth_signals = axon.signals
             past_positions = set()
             direction = axon.direction
 
             # Stop if trying to move to a past position
-            while position not in past_positions:
-                past_positions.add(position)
+            while axon_position not in past_positions:
+                past_positions.add(axon_position)
                 attraction = Vector(self.dimension_size, tuple(0 for _ in range(self.n_dimension)))
 
                 # Sum the attractive effects between the signals
-                for effect_signal, location in all_signals:
-                    for guide_signal in guide_signals:
-                        degree_of_attraction = self.signal_profile.attraction(guide_signal, effect_signal)
-                        attraction += div((location - position) * degree_of_attraction, position.city_distance(location))
+                for guide_signal, location, effective_range in all_signals:
+                    distance = location.city_distance(axon_position)
+
+                    # do not apply signals out of range
+                    if distance <= effective_range:
+                        for growth_signal in growth_signals:
+                            degree_of_attraction = self.signal_profile.attraction(growth_signal, guide_signal)
+
+                            # dividing by distance to weaken farther signals
+                            attraction += div((location - axon_position) * degree_of_attraction, distance)
 
                 # Stop if the net attraction is zero
                 if all(c == 0 for c in attraction.value):
@@ -130,9 +136,9 @@ class Mind:
                 direction = (direction + attraction).city_unit()
 
                 # Move the axon clipping to the hypercube size
-                position = (position + direction).clip()
+                axon_position = (axon_position + direction).clip()
 
-            axon.position = position
+            axon.position = axon_position
 
     def step(self, c_time: int):
         # Iterate multiple times so always writing to data not being read from.

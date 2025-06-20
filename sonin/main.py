@@ -86,6 +86,8 @@ from sonin.model.neuron import Neuron, TetanicPeriod
 #     - Concentration gradients can have thresholds that affect the fate of cells.
 #     - Sequential induction can affect the fate of cells through one of the signaling mechanisms to neighbors.
 #     - Can develop new signals by cloning successful signals and varying them independently.
+#     - Could be fine to define signal exposure to be proportional to distance rather than inversely proportional.
+#     - Local signals could have a maximum range and be all or nothing.
 #
 #   - Axon guidance is affected by:
 #     - both attractive and repulsive forces

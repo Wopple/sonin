@@ -103,8 +103,8 @@ class Neuron:
     # Determines where synaptic connections can be made
     axon: Axon
 
-    # The signals this neuron emits
-    signals: set[Signal] = field(default_factory=set)
+    # The signals this neuron emits and their effective range
+    signals: dict[Signal, int] = field(default_factory=set)
 
     # True if the neuron excites other neurons, False if it inhibits other neurons
     excites: bool = True
