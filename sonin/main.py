@@ -53,7 +53,7 @@ from sonin.model.neuron import Neuron, TetanicPeriod
 #     - synaptic facilitation
 #     - post-tetanic potentiation
 #   - Synaptic depression reduces the potential passed along when repeats happen with some distance apart.
-#   - Synaptic facilitation increases the potential passed when repeats happen a very short distance apart.
+#   - Synaptic facilitation increases the potential passed along  when repeats happen a very short distance apart.
 #     - Continued repeats will have a reduced increasing effect.
 #   - Post-tetanic potentiation is a lasting increase in synaptic susceptibility after a high frequency series of action
 #       potentials. This is likely related to memory.

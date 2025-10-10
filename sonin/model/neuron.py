@@ -2,8 +2,8 @@ from dataclasses import dataclass, field, InitVar
 from typing import Self
 
 from sonin.model.hypercube import Vector
-from sonin.model.stimulation import SnapBack
 from sonin.model.signal import Signal
+from sonin.model.stimulation import SnapBack
 from sonin.model.synapse import Synapse
 
 # Will accept potential from pre-synaptic neurons
@@ -15,6 +15,8 @@ REFACTORY = 'refactory'
 
 @dataclass
 class TetanicPeriod:
+    """ Represents a periodic schedule of tetanic activations """
+
     # Number of steps to begin tetanic activation
     threshold: int
 
@@ -45,6 +47,7 @@ class TetanicPeriod:
                 self._n_time = c_time + self.threshold
 
     def is_active(self, c_time) -> bool:
+        """ Returns True if the neuron should fire """
         return not self._dormant and (self._n_time - c_time) % (self.gap + 1) == 0
 
 
@@ -103,8 +106,8 @@ class Neuron:
     # Determines where synaptic connections can be made
     axon: Axon
 
-    # The signals this neuron emits and their effective range
-    signals: dict[Signal, int] = field(default_factory=set)
+    # The signals this neuron emits
+    signals: set[Signal] = field(default_factory=set)
 
     # True if the neuron excites other neurons, False if it inhibits other neurons
     excites: bool = True
@@ -139,30 +142,25 @@ class Neuron:
     stimulation: SnapBack = field(init=False)
     stimulation_amount: int = 64
     stimulation_restore_rate: InitVar[int] = 8
-    stimulation_restore_scalar: InitVar[int] = 7
+    stimulation_restore_damper: InitVar[int] = 7
+
+    # Effective range for each signal emitted by this neuron
+    effective_range: dict[Signal, int] = field(default_factory=dict)
 
     def __post_init__(
         self,
         stimulation_restore_rate: int,
-        stimulation_restore_scalar: int,
+        stimulation_restore_damper: int,
     ):
         # Detects frequent activations
         self.stimulation = SnapBack(
             restore_rate=stimulation_restore_rate,
-            restore_scalar=stimulation_restore_scalar,
+            restore_damper=stimulation_restore_damper,
         )
 
     @property
     def inhibits(self) -> bool:
         return not self.excites
-
-    @property
-    def potential(self) -> int:
-        return self._potential
-
-    @potential.setter
-    def potential(self, potential):
-        self._potential = potential
 
     def step(self, c_time: int):
         self.stimulation.step()

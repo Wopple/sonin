@@ -1,5 +1,6 @@
-from pytest import mark
 from random import seed
+
+from pytest import mark
 
 from sonin.model.mutation import IntMutagen, UintMutagen
 

@@ -4,7 +4,7 @@ from sonin.model.stimulation import SnapBack
 
 
 @mark.parametrize(
-    'baseline, rate, scalar, initial, expected',
+    'baseline, rate, damper, initial, expected',
     [
         (0, 2, 1, 0, 0),
         (0, 2, 1, 1, 0),
@@ -19,11 +19,11 @@ from sonin.model.stimulation import SnapBack
         (-3, 3, 2, -10, -7),
     ],
 )
-def test_snap_back_step(baseline: int, rate: int, scalar: int, initial: int, expected: int):
+def test_snap_back_step(baseline: int, rate: int, damper: int, initial: int, expected: int):
     snap_back = SnapBack(
         baseline=baseline,
         restore_rate=rate,
-        restore_scalar=scalar,
+        restore_damper=damper,
     )
 
     snap_back.value = initial

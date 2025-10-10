@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Callable, Generator, Self
 
-from sonin.model.math import div
+from sonin.sonin_math import div
 
 
 @dataclass
@@ -138,6 +138,9 @@ class Vector:
         # This algorithm will be close and usually correct, but not always.
         # This algorithm can be improved if necessary by checking the adjacent
         # positions or by doing a proper cosine similarity check.
+        # The intuition is, if a component of the vector has a relatively high
+        # magnitude compared to the other components, the unit vector likely
+        # has a magnitude of 1 in the same direction.
         def approximate_coordinate(c: int) -> int:
             if abs(c) >= div(largest, 2):
                 if c > 0:
@@ -162,8 +165,11 @@ class Hypercube[T]:
     def initialize(self, create_item: Callable[[Vector], T]):
         def create_items(n_dimension: int, position: Vector) -> Generator[T, None, None]:
             if n_dimension == 0:
+                # Only yield completed vectors.
                 yield create_item(position)
             else:
+                # Create a copy for every possible next index and recurse on each of them
+                # yielding all results.
                 for p in range(self.dimension_size):
                     yield from create_items(n_dimension - 1, position.grow(p))
 

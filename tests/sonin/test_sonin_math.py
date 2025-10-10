@@ -1,6 +1,6 @@
 from pytest import mark
 
-from sonin.model.math import div
+from sonin.sonin_math import div
 
 
 @mark.parametrize(

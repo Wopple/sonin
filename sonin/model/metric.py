@@ -1,5 +1,5 @@
 # Record behavior to make functional decisions and improve developer insight
-from sonin.model.math import div
+from sonin.sonin_math import div
 
 
 class FrequencyProfile:
@@ -37,7 +37,7 @@ class FrequencyProfile:
     @property
     def instability(self) -> int:
         """
-        Sum of distance from the mean.
+        Sum of distances from the mean of all recorded deltas.
         """
         mean = self.mean
 

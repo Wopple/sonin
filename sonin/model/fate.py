@@ -2,11 +2,16 @@
 # We need to represent not only the developing cells, but also the environment they develop within.
 
 from dataclasses import dataclass
-from typing import Self, Callable
+from typing import Callable, Self
 
 from sonin.model.signal import Level, Signal
 
 type Threshold = int
+type IsLower = bool
+
+# Represents a collection of predicates:
+#     "does the level of this `Signal` reach the `Threshold` from the direction indicated by `IsLower`?"
+type IsLeft = list[(Signal, Threshold, IsLower)]
 
 
 class FateNode:
@@ -17,15 +22,15 @@ class FateNode:
         raise NotImplementedError("FateNode.size")
 
 
-# A fate is a final decision for a cell.
 @dataclass
 class Fate(FateNode):
+    """ The final configuration of a cell """
     excites: bool
     activation_level: int
     refactory_period: int
     stimulation_amount: int
     stimulation_restore_rate: int
-    stimulation_restore_scalar: int
+    stimulation_restore_damper: int
     tetanic_threshold: int
     tetanic_activations: int
     tetanic_gap: int
@@ -39,9 +44,10 @@ class Fate(FateNode):
 
 @dataclass
 class BinaryFate(FateNode):
+    """ A branch in a decision tree """
     left: FateNode
     right: FateNode
-    is_left: list[(Signal, Threshold)]
+    is_left: IsLeft
 
     def __iter__(self):
         if isinstance(self.left, BinaryFate):
@@ -55,7 +61,10 @@ class BinaryFate(FateNode):
             yield self.right
 
     def get_fate(self, signals: dict[Signal, Level]) -> Fate:
-        if all(signals[signal] >= level for signal, level in self.is_left):
+        if all(
+            signals[signal] >= level if is_lower else signals[signal] <= level
+            for signal, level, is_lower in self.is_left
+        ):
             return self.left.get_fate(signals)
         else:
             return self.right.get_fate(signals)
@@ -96,7 +105,7 @@ class FateTree:
 
         return child, parent, g_parent, was_left, g_was_left
 
-    def add(self, is_left: list[(Signal, Threshold)], leaf: Fate, is_next_left: Callable[[], bool]):
+    def add(self, is_left: IsLeft, leaf: Fate, is_next_left: Callable[[], bool]):
         if self.root is None:
             self.root = leaf
             return

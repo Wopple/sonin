@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
-from random import randint, choice
+from random import choice, randint
 
 from sonin.model.hypercube import Hypercube, Vector
-from sonin.model.math import div
-from sonin.model.neuron import ACCEPTING, Neuron, Axon
+from sonin.model.neuron import ACCEPTING, Axon, Neuron
 from sonin.model.signal import SignalProfile
 from sonin.model.synapse import Synapse
+from sonin.sonin_math import div
 
 
 def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int, max_strength: int):
@@ -43,6 +43,7 @@ def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int):
         if synapse.strength > strength:
             synapse.strength -= strength
         else:
+            # disconnect the synapse when the strength reaches zero
             del pre_neuron.post_synapses[post_index]
             del post_neuron.pre_synapses[pre_index]
 
@@ -102,7 +103,10 @@ class Mind:
                 n.potential = 0
 
     def guide_axons(self):
-        all_signals = [(signal, n.position, range) for n in self.neurons for signal, range in n.signals.items()]
+        all_signals = [
+            (signal, n.position, n.effective_range.get(signal, self.n_dimension * self.dimension_size))
+            for n in self.neurons for signal in n.signals
+        ]
 
         for n in self.neurons:
             axon = n.axon
@@ -141,6 +145,8 @@ class Mind:
             axon.position = axon_position
 
     def step(self, c_time: int):
+        """ Advance the mind forward one step. `c_time` is a monotonically increasing step number. """
+
         # Iterate multiple times so always writing to data not being read from.
         # This makes the algorithm trivial to parallelize.
 

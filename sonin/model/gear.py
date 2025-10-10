@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sonin.model.math import div
+from sonin.sonin_math import div
 
 
 @dataclass

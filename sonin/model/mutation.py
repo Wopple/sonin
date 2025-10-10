@@ -6,7 +6,10 @@ from sonin.model.neuron import TetanicPeriod
 
 class Mutagen:
     def __init__(self, occurrence_weight: int | None = None, deviation_weight: int | None = None):
+        # higher occurrence increases the chance of a mutation
         self.occurrence_weight: int = occurrence_weight or 1
+
+        # higher deviation increases the impact of a mutation
         self.deviation_weight: int = deviation_weight or 1
 
         assert self.occurrence_weight >= 1

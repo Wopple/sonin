@@ -29,7 +29,7 @@ class Dna:
         # Neurons cannot propagate more potential than this when activating
         self._max_neuron_strength: UintMutagen = UintMutagen(max_neuron_strength, 1)
 
-        # Neurons cannot propagate more potential than this when activating
+        # Maximum city block distance an axon can reach away from the neuron
         self._axon_range: UintMutagen = UintMutagen(axon_range, 1)
 
         # Amount of time a neuron stays in the refactory state (min 1)

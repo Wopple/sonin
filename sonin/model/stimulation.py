@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from sonin.model.math import div
+from sonin.sonin_math import div
 
 
 @dataclass
@@ -14,7 +14,7 @@ class SnapBack:
 
     # Higher values create a slower snap back
     # 0: snaps back all the way immediately
-    restore_scalar: int = 0
+    restore_damper: int = 0
 
     _value: int = field(init=False)
 
@@ -25,8 +25,8 @@ class SnapBack:
         self._value: int = 0
 
         assert self.restore_rate >= 1
-        assert self.restore_scalar >= 0
-        assert self.restore_rate >= self.restore_scalar
+        assert self.restore_damper >= 0
+        assert self.restore_rate >= self.restore_damper
 
     @property
     def value(self) -> int:
@@ -37,8 +37,5 @@ class SnapBack:
         self._value = value - self.baseline
 
     def step(self):
-        if self._value > 0:
-            self._value = div(self._value * self.restore_scalar, self.restore_rate)
-        elif self._value < 0:
-            positive = -self._value
-            self._value = -(div(positive * self.restore_scalar, self.restore_rate))
+        if self._value != 0:
+            self._value = div(self._value * self.restore_damper, self.restore_rate)

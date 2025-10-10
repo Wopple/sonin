@@ -3,7 +3,7 @@ from pytest import fixture
 from sonin.model.dna import Dna
 from sonin.model.hypercube import Vector
 from sonin.model.mind import strengthen_connection, weaken_connection
-from sonin.model.neuron import Neuron, Axon
+from sonin.model.neuron import Axon, Neuron
 
 
 @fixture
