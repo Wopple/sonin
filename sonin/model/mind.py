@@ -81,7 +81,10 @@ class Mind:
         def random_component(idx: int) -> int:
             return (center.value[idx] + randint(-distance, distance)) % self.dimension_size
 
-        return Vector(self.dimension_size, tuple(random_component(idx) for idx in range(self.n_dimension)))
+        return Vector(
+            value=tuple(random_component(idx) for idx in range(self.n_dimension)),
+            dimension_size=self.dimension_size,
+        )
 
     def randomize_synapses(self):
         for pre_n in self.neurons:
@@ -118,7 +121,11 @@ class Mind:
             # Stop if trying to move to a past position
             while axon_position not in past_positions:
                 past_positions.add(axon_position)
-                attraction = Vector(self.dimension_size, tuple(0 for _ in range(self.n_dimension)))
+
+                attraction = Vector(
+                    value=tuple(0 for _ in range(self.n_dimension)),
+                    dimension_size=self.dimension_size,
+                )
 
                 # Sum the attractive effects between the signals
                 for guide_signal, location, effective_range in all_signals:
@@ -129,6 +136,7 @@ class Mind:
                         for growth_signal in growth_signals:
                             degree_of_attraction = self.signal_profile.attraction(growth_signal, guide_signal)
 
+                            # TODO: use the method from SignalProfile
                             # dividing by distance to weaken farther signals
                             attraction += div((location - axon_position) * degree_of_attraction, distance)
 

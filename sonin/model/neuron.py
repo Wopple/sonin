@@ -95,7 +95,7 @@ class Axon:
 
         assert len(direction) == n_dimension
 
-        self.direction = Vector(dimension_size, direction)
+        self.direction = Vector(value=direction, dimension_size=dimension_size)
 
 
 @dataclass

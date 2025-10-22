@@ -10,7 +10,7 @@ def test_growth_1():
     incubator = Incubator(
         n_dimension=2,
         dimension_size=dimension_size,
-        environment=[(1, 20, Vector(dimension_size, (0, 0)))],
+        environment=[(1, 20, Vector(value=(0, 0), dimension_size=dimension_size))],
         signal_profile=SignalProfile({
             1: {1: 5, 2: -10},
             2: {1: 0},
@@ -34,7 +34,7 @@ def test_growth_2():
     incubator = Incubator(
         n_dimension=2,
         dimension_size=dimension_size,
-        environment=[(1, 20, Vector(dimension_size, (0, 0)))],
+        environment=[(1, 20, Vector(value=(0, 0), dimension_size=dimension_size))],
         signal_profile=SignalProfile({
             1: {1: 5, 2: -10},
             2: {1: 0},
@@ -62,8 +62,8 @@ def test_growth_3():
         n_dimension=2,
         dimension_size=dimension_size,
         environment=[
-            (1, 4, Vector(dimension_size, (0, 0))),
-            (1, 1, Vector(dimension_size, (2, 2))),
+            (1, 4, Vector(value=(0, 0), dimension_size=dimension_size)),
+            (1, 1, Vector(value=(2, 2), dimension_size=dimension_size)),
         ],
         signal_profile=SignalProfile({
             2: {1: 1},

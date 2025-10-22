@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 
 from sonin.model.hypercube import Vector
-from sonin.sonin_math import div
 
 # Identifies a signal
 type Signal = int
@@ -44,8 +43,7 @@ class SignalProfile:
 
         if distance == 0:
             return Vector(
-                dimension_size=this_position.dimension_size,
-                value=tuple(0 for _ in range(this_position.n_dimension)),
+                value=tuple(0 for _ in range(this_position.n_dimension))
             )
 
         direction = that_position - this_position

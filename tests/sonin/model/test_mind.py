@@ -18,7 +18,7 @@ def dna(n_dimension: int) -> Dna:
 
 @fixture
 def neuron_1(dna: Dna) -> Neuron:
-    position = Vector(dna.n_dimension, (0,))
+    position = Vector(value=(0,), dimension_size=dna.n_dimension)
 
     return Neuron(
         position=position,
@@ -30,7 +30,7 @@ def neuron_1(dna: Dna) -> Neuron:
 
 @fixture
 def neuron_2(dna: Dna) -> Neuron:
-    position = Vector(dna.n_dimension, (1,))
+    position = Vector(value=(1,), dimension_size=dna.n_dimension)
 
     return Neuron(
         position=position,

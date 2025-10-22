@@ -20,9 +20,9 @@ DIMENSION_SIZE = 50
     ],
 )
 def test_add(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
-    v_a = Vector(len(a), a)
-    v_b = Vector(len(b), b)
-    v_expected = Vector(len(expected), expected)
+    v_a = Vector(value=a, dimension_size=len(a))
+    v_b = Vector(value=b, dimension_size=len(b))
+    v_expected = Vector(value=expected, dimension_size=len(expected))
 
     assert v_a + b == v_expected
     assert v_a + list(b) == v_expected
@@ -43,9 +43,9 @@ def test_add(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
     ],
 )
 def test_sub(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
-    v_a = Vector(DIMENSION_SIZE, a)
-    v_b = Vector(DIMENSION_SIZE, b)
-    v_expected = Vector(DIMENSION_SIZE, expected)
+    v_a = Vector(value=a, dimension_size=DIMENSION_SIZE)
+    v_b = Vector(value=b, dimension_size=DIMENSION_SIZE)
+    v_expected = Vector(value=expected, dimension_size=DIMENSION_SIZE)
 
     assert v_a - v_b == v_expected
 
@@ -65,8 +65,8 @@ def test_sub(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
     ],
 )
 def test_mul(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
-    v_a = Vector(DIMENSION_SIZE, a)
-    v_expected = Vector(DIMENSION_SIZE, expected)
+    v_a = Vector(value=a, dimension_size=DIMENSION_SIZE)
+    v_expected = Vector(value=expected, dimension_size=DIMENSION_SIZE)
 
     assert v_a * b == v_expected
 
@@ -85,8 +85,8 @@ def test_mul(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
     ],
 )
 def test_dot_product(a: tuple[int, ...], b: tuple[int, ...], expected: int):
-    v_a = Vector(DIMENSION_SIZE, a)
-    v_b = Vector(DIMENSION_SIZE, b)
+    v_a = Vector(value=a, dimension_size=DIMENSION_SIZE)
+    v_b = Vector(value=b, dimension_size=DIMENSION_SIZE)
 
     assert v_a * v_b == expected
 
@@ -107,8 +107,8 @@ def test_dot_product(a: tuple[int, ...], b: tuple[int, ...], expected: int):
     ],
 )
 def test_div(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
-    v_a = Vector(DIMENSION_SIZE, a)
-    v_expected = Vector(DIMENSION_SIZE, expected)
+    v_a = Vector(value=a, dimension_size=DIMENSION_SIZE)
+    v_expected = Vector(value=expected, dimension_size=DIMENSION_SIZE)
 
     assert v_a / b == v_expected
     assert v_a // b == v_expected
@@ -130,8 +130,8 @@ def test_div(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
     ],
 )
 def test_rdiv(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
-    v_a = Vector(DIMENSION_SIZE, a)
-    v_expected = Vector(DIMENSION_SIZE, expected)
+    v_a = Vector(value=a, dimension_size=DIMENSION_SIZE)
+    v_expected = Vector(value=expected, dimension_size=DIMENSION_SIZE)
 
     assert b / v_a == v_expected
     assert b // v_a == v_expected
@@ -158,7 +158,7 @@ def test_rdiv(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
     ],
 )
 def test_out_of_bounds(before: tuple[int, ...], expected: bool):
-    actual = Vector(DIMENSION_SIZE, before).out_of_bounds()
+    actual = Vector(value=before, dimension_size=DIMENSION_SIZE).out_of_bounds()
 
     assert actual is expected
 
@@ -194,7 +194,7 @@ def test_out_of_bounds(before: tuple[int, ...], expected: bool):
     ],
 )
 def test_city_unit(before: tuple[int, ...], expected: tuple[int, ...]):
-    actual = Vector(DIMENSION_SIZE, before).city_unit().value
+    actual = Vector(value=before, dimension_size=DIMENSION_SIZE).city_unit().value
 
     assert actual == expected
 
