@@ -7,10 +7,10 @@ from sonin.model.stimulation import SnapBack
 from sonin.model.synapse import Synapse
 
 # Will accept potential from pre-synaptic neurons
-ACCEPTING = 'accepting'
+ACCEPTING = 0
 
 # Will reject potential from pre-synaptic neurons
-REFACTORY = 'refactory'
+REFACTORY = 1
 
 
 @dataclass
@@ -131,7 +131,7 @@ class Neuron:
     pre_synapses: dict[int, Synapse] = field(default_factory=dict)
 
     # Current state of the neuron
-    state: str = ACCEPTING
+    state: int = ACCEPTING
 
     # If True, will send potential to post-synaptic neurons
     activated: bool = False

@@ -20,10 +20,12 @@ DIMENSION_SIZE = 50
     ],
 )
 def test_add(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
-    v_a = Vector(DIMENSION_SIZE, a)
-    v_b = Vector(DIMENSION_SIZE, b)
-    v_expected = Vector(DIMENSION_SIZE, expected)
+    v_a = Vector(len(a), a)
+    v_b = Vector(len(b), b)
+    v_expected = Vector(len(expected), expected)
 
+    assert v_a + b == v_expected
+    assert v_a + list(b) == v_expected
     assert v_a + v_b == v_expected
 
 
@@ -109,6 +111,56 @@ def test_div(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
     v_expected = Vector(DIMENSION_SIZE, expected)
 
     assert v_a / b == v_expected
+    assert v_a // b == v_expected
+
+
+@mark.parametrize(
+    "a, b, expected",
+    [
+        ((1,), 0, (0,)),
+        ((1,), 1, (1,)),
+        ((1,), 2, (2,)),
+        ((2,), 3, (1,)),
+        ((2,), 4, (2,)),
+        ((2,), -4, (-2,)),
+        ((-2,), 4, (-2,)),
+        ((3,), 2, (0,)),
+        ((2,), -3, (-1,)),
+        ((6, 3), 6, (1, 2)),
+    ],
+)
+def test_rdiv(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
+    v_a = Vector(DIMENSION_SIZE, a)
+    v_expected = Vector(DIMENSION_SIZE, expected)
+
+    assert b / v_a == v_expected
+    assert b // v_a == v_expected
+
+
+@mark.parametrize(
+    "before, expected",
+    [
+        ((-1,), True),
+        ((0,), False),
+        ((1,), False),
+        ((DIMENSION_SIZE // 2,), False),
+        ((DIMENSION_SIZE - 2,), False),
+        ((DIMENSION_SIZE - 1,), False),
+        ((DIMENSION_SIZE,), True),
+        ((-1, -1), True),
+        ((0, -1), True),
+        ((-1, 0), True),
+        ((0, 0), False),
+        ((DIMENSION_SIZE, DIMENSION_SIZE), True),
+        ((0, DIMENSION_SIZE), True),
+        ((DIMENSION_SIZE, 0), True),
+        ((0, 0), False),
+    ],
+)
+def test_out_of_bounds(before: tuple[int, ...], expected: bool):
+    actual = Vector(DIMENSION_SIZE, before).out_of_bounds()
+
+    assert actual is expected
 
 
 @mark.parametrize(
