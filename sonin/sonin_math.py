@@ -1,8 +1,14 @@
 def div(a: int, b: int) -> int:
     """
     Python rounds towards -inf. This is wrong for this project. This rounds towards zero instead.
+    Rust rounds towards zero already, so this is necessary for parity of behavior.
     """
-    if (a < 0) != (b < 0) and a % b != 0:
-        return a // b + 1
+    result = a // b
+    is_negative = result < 0
+    is_rounded = a % b != 0
+
+    if is_negative and is_rounded:
+        # round the other way
+        return result + 1
     else:
-        return a // b
+        return result
