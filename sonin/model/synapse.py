@@ -1,10 +1,9 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
 from sonin.model.hypercube import Vector
 
 
-@dataclass
-class Synapse:
+class Synapse(BaseModel):
     pre_neuron: Vector
     post_neuron: Vector
     strength: int

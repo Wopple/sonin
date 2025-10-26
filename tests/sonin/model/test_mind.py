@@ -22,7 +22,7 @@ def neuron_1(dna: Dna) -> Neuron:
 
     return Neuron(
         position=position,
-        axon=Axon(position, dna.n_dimension, dna.dimension_size),
+        axon=Axon(position=position, n_dimension=dna.n_dimension, dimension_size=dna.dimension_size),
         activation_level=dna.activation_level,
         refactory_period=dna.refactory_period,
     )
@@ -34,7 +34,7 @@ def neuron_2(dna: Dna) -> Neuron:
 
     return Neuron(
         position=position,
-        axon=Axon(position, dna.n_dimension, dna.dimension_size),
+        axon=Axon(position=position, n_dimension=dna.n_dimension, dimension_size=dna.dimension_size),
         activation_level=dna.activation_level,
         refactory_period=dna.refactory_period,
     )

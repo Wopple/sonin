@@ -1,11 +1,11 @@
-from dataclasses import dataclass, field
-from typing import Callable, Generator, Self
+from typing import Any, Callable, Generator, Iterator, Self
+
+from pydantic import BaseModel, Field
 
 from sonin.sonin_math import div
 
 
-@dataclass
-class Vector:
+class Vector(BaseModel):
     # Virtual path of indices to a neuron in the hypercube
     value: tuple[int, ...]
 
@@ -13,9 +13,17 @@ class Vector:
     dimension_size: int | None = None
 
     # Index of the position in the single dimensional representation of the hypercube
-    index: int | None = field(default=None, init=False)
+    # Requires dimension_size to calculate
+    index: int | None = None
 
-    def __post_init__(self):
+    @classmethod
+    def of(cls, value: tuple[int, ...] | list[int], dimension_size: int | None = None):
+        return Vector(
+            value=tuple(value),
+            dimension_size=dimension_size,
+        )
+
+    def model_post_init(self, context: Any, /):
         if self.dimension_size is not None:
             self.index = sum(v * self.dimension_size ** i for i, v in enumerate(reversed(self.value)))
 
@@ -45,32 +53,20 @@ class Vector:
         return self.index
 
     def __neg__(self):
-        return Vector(
-            value=tuple(-v for v in self.value),
-            dimension_size=self.dimension_size,
-        )
+        return Vector.of(tuple(-v for v in self.value), self.dimension_size)
 
     def __add__(self, other: int | tuple[int, ...] | list[int] | Self) -> Self:
         if isinstance(other, int):
-            return Vector(
-                value=tuple(v + other for v in self.value),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(v + other for v in self.value), self.dimension_size)
         elif isinstance(other, tuple | list):
             assert self.n_dimension == len(other), f"{self.n_dimension} != {len(other)}"
 
-            return Vector(
-                value=tuple(s + o for s, o in zip(self.value, other)),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(s + o for s, o in zip(self.value, other)), self.dimension_size)
         elif isinstance(other, Vector):
             assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
             assert self.n_dimension == other.n_dimension, f"{self.n_dimension} != {other.n_dimension}"
 
-            return Vector(
-                value=tuple(s + o for s, o in zip(self.value, other.value)),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(s + o for s, o in zip(self.value, other.value)), self.dimension_size)
         else:
             raise TypeError(f"Vector.__add__ unexpected type: {other}")
 
@@ -92,10 +88,7 @@ class Vector:
 
     def __mul__(self, other: int | Self) -> int | Self:
         if isinstance(other, int):
-            return Vector(
-                value=tuple(v * other for v in self.value),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(v * other for v in self.value), self.dimension_size)
         elif isinstance(other, Vector):
             assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
 
@@ -114,29 +107,17 @@ class Vector:
 
     def __floordiv__(self, other: int | Self) -> Self:
         if isinstance(other, int):
-            return Vector(
-                value=tuple(div(v, other) for v in self.value),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(div(v, other) for v in self.value), self.dimension_size)
         elif isinstance(other, Vector):
-            return Vector(
-                value=tuple(div(vs, vo) for vs, vo in zip(self.value, other.value)),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(div(vs, vo) for vs, vo in zip(self.value, other.value)), self.dimension_size)
         else:
             raise TypeError(f"Vector.__floordiv__ unexpected type: {other}")
 
     def __rfloordiv__(self, other: int | Self) -> Self:
         if isinstance(other, int):
-            return Vector(
-                value=tuple(div(other, v) for v in self.value),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(div(other, v) for v in self.value), self.dimension_size)
         elif isinstance(other, Vector):
-            return Vector(
-                value=tuple(div(vo, vs) for vs, vo in zip(self.value, other.value)),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(div(vo, vs) for vs, vo in zip(self.value, other.value)), self.dimension_size)
         else:
             raise TypeError(f"Vector.__rfloordiv__ unexpected type: {other}")
 
@@ -152,27 +133,24 @@ class Vector:
             else:
                 return value
 
-        return Vector(
-            value=tuple(clip(v, 0, self.dimension_size) for v in self.value),
-            dimension_size=self.dimension_size,
-        )
+        return Vector.of(tuple(clip(v, 0, self.dimension_size) for v in self.value), self.dimension_size)
 
     def grow(self, other: int) -> Self:
         """
         Grow the position by a single index
         """
-        return Vector(
-            value=self.value + (other,),
-            dimension_size=self.dimension_size,
-        )
+        return Vector.of(self.value + (other,), self.dimension_size)
 
-    def city_distance(self, other: Self) -> int:
+    def city_distance(self, other: tuple[int, ...] | list[int] | Self) -> int:
         """
         Integer based distance function using city block distance
-        >>> Vector((1, 2), 4).city_distance(Vector((3, 0), 4))
-        4
+        >>> Vector.of((1, 2)).city_distance([3, 1])
+        3
         """
-        return sum(abs(a - b) for a, b in zip(self.value, other.value, strict=True))
+        if isinstance(other, Vector):
+            other = other.value
+
+        return sum(abs(a - b) for a, b in zip(self.value, other, strict=True))
 
     def city_unit(self) -> Self:
         """
@@ -182,10 +160,7 @@ class Vector:
         largest = max(abs(c) for c in self.value)
 
         if largest == 0:
-            return Vector(
-                value=tuple(0 for _ in range(self.n_dimension)),
-                dimension_size=self.dimension_size,
-            )
+            return Vector.of(tuple(0 for _ in range(self.n_dimension)), self.dimension_size)
 
         # This algorithm will be close and usually correct, but not always.
         # This algorithm can be improved if necessary by checking the adjacent
@@ -202,19 +177,15 @@ class Vector:
             else:
                 return 0
 
-        return Vector(
-            value=tuple(approximate_coordinate(c) for c in self.value),
-            dimension_size=self.dimension_size,
-        )
+        return Vector.of(tuple(approximate_coordinate(c) for c in self.value), self.dimension_size)
 
 
-@dataclass
-class Hypercube[T]:
+class Hypercube[T](BaseModel):
     n_dimension: int
     dimension_size: int
-    items: list[T] = field(default_factory=list)
+    items: list[T] = Field(default_factory=list)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         return iter(self.items)
 
     def initialize(self, create_item: Callable[[Vector], T]):
@@ -228,13 +199,13 @@ class Hypercube[T]:
                 for p in range(self.dimension_size):
                     yield from create_items(n_dimension - 1, position.grow(p))
 
-        self.items = list(create_items(self.n_dimension, Vector(value=(), dimension_size=self.dimension_size)))
+        self.items = list(create_items(self.n_dimension, Vector.of((), self.dimension_size)))
 
     def get(self, position: int | tuple[int, ...] | list[int] | Vector) -> T:
         if isinstance(position, int):
             return self.items[position]
         elif isinstance(position, tuple | list):
-            return self.items[Vector(value=tuple(position), dimension_size=self.dimension_size).index]
+            return self.items[Vector.of(tuple(position), self.dimension_size).index]
         else:
             return self.items[position.index]
 
@@ -242,9 +213,9 @@ class Hypercube[T]:
         single = self.dimension_size % 2 == 1
 
         # for even dimension sizes, this is the corner with the smallest indices
-        center = Vector(
-            value=tuple(div(self.dimension_size - 1, 2) for _ in range(self.n_dimension)),
-            dimension_size=self.dimension_size,
+        center = Vector.of(
+            tuple(div(self.dimension_size - 1, 2) for _ in range(self.n_dimension)),
+            self.dimension_size,
         )
 
         if single:

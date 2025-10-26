@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Vector
 
@@ -18,9 +18,8 @@ type Affinity = int
 type AffinityDict = dict[Signal, dict[Signal, Affinity]]
 
 
-@dataclass
-class SignalProfile:
-    affinities: AffinityDict = field(default_factory=dict)
+class SignalProfile(BaseModel):
+    affinities: AffinityDict = Field(default_factory=dict)
 
     def attraction(self, this_signal: Signal, that_signal: Signal) -> Affinity:
         attraction = self.affinities.get(this_signal)

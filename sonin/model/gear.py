@@ -1,17 +1,17 @@
-from dataclasses import dataclass
+from pydantic import BaseModel, Field
 
 from sonin.sonin_math import div
 
 
-@dataclass
-class Gear:
+class Gear(BaseModel):
     # Increases output speed
-    up: int
+    up: int = Field(ge=1)
 
     # Decreases output speed
-    down: int
+    down: int = Field(ge=1)
 
-    # Stores the progress towards the next output
+    # Stores the progress towards the next output to avoid loss of precision due to int division rounding.
+    # Changes to up and down should scale the current as well, but this is likely an unnecessary level of precision.
     current: int = 0
 
     def __call__(self, x: int) -> int:

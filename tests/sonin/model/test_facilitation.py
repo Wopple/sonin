@@ -52,8 +52,8 @@ def test_facilitation_gear(granularity: int, limit: int, modulations: list[int],
     for m in modulations:
         facilitation.modulate(m)
 
-    assert facilitation._gear.up == expected_up
-    assert facilitation._gear.down == expected_down
+    assert facilitation.gear.up == expected_up
+    assert facilitation.gear.down == expected_down
 
 
 @mark.parametrize(

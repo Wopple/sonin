@@ -1,5 +1,7 @@
-from dataclasses import dataclass, field
 from random import choice, randint
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Hypercube, Vector
 from sonin.model.neuron import ACCEPTING, Axon, Neuron
@@ -48,17 +50,18 @@ def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int):
             del post_neuron.pre_synapses[pre_index]
 
 
-@dataclass
-class Mind:
+class Mind(BaseModel):
     n_synapse: int
     n_dimension: int
     dimension_size: int
     max_neuron_strength: int
     axon_range: int
-    neurons: Hypercube[Neuron] = field(init=False)
-    signal_profile: SignalProfile = field(default_factory=SignalProfile)
+    neurons: Hypercube[Neuron] = None
+    signal_profile: SignalProfile = Field(default_factory=SignalProfile)
 
-    def __post_init__(self):
+    def model_post_init(self, context: Any, /):
+        assert self.neurons is None
+
         self.neurons = Hypercube(
             n_dimension=self.n_dimension,
             dimension_size=self.dimension_size,
@@ -67,7 +70,7 @@ class Mind:
     def initialize(self, activation_level: int, refactory_period: int):
         self.neurons.initialize(lambda position: Neuron(
             position=position,
-            axon=Axon(position, self.n_dimension, self.dimension_size),
+            axon=Axon(position=position, n_dimension=self.n_dimension, dimension_size=self.dimension_size),
             activation_level=activation_level,
             refactory_period=refactory_period,
         ))
@@ -153,10 +156,13 @@ class Mind:
             axon.position = axon_position
 
     def step(self, c_time: int):
-        """ Advance the mind forward one step. `c_time` is a monotonically increasing step number. """
+        """
+        Advance the mind forward one step.
+        `c_time` is a monotonically increasing step number.
+        """
 
-        # Iterate multiple times so always writing to data not being read from.
-        # This makes the algorithm trivial to parallelize.
+        # Iterate multiple times to avoid reading from and writing to the same data.
+        # This makes the algorithm trivial to parallelize at a later time.
 
         for n in self.neurons:
             n.step(c_time)

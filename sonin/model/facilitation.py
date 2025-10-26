@@ -1,48 +1,60 @@
-from dataclasses import dataclass, field
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from sonin.model.gear import Gear
 
 
-@dataclass
-class Facilitation:
-    # Larger numbers decrease the degree of each modulation
-    granularity: int
+class Facilitation(BaseModel):
+    """
+    Facilitation scales an input up or down.
+    It can be modulated to either increase or decrease the scaling.
+    """
 
-    # Larger numbers increase the maximum degrees of modulation
-    limit: int
+    # Larger numbers decrease the degree of each modulation.
+    # This works by setting a minimum bound on a gear's values.
+    # With a larger value, each increment of a gear's value is less impactful allowing for finer grained facilitation.
+    granularity: int = Field(ge=1)
 
-    _gear: Gear = field(init=False)
+    # The maximum degrees of facilitation.
+    # The impact of each degree is determined by the granularity.
+    limit: int = Field(ge=0)
 
-    def __post_init__(self):
-        assert self.granularity >= 1
-        assert self.limit >= 0
+    gear: Gear = None
 
-        self._gear: Gear = Gear(up=self.granularity, down=self.granularity)
+    def model_post_init(self, context: Any, /):
+        assert self.gear is None
+
+        self.gear = Gear(up=self.granularity, down=self.granularity)
 
     def __call__(self, x: int) -> int:
-        return self._gear(x)
+        return self.gear(x)
 
     @property
     def current(self) -> int:
-        return self._gear.up - self._gear.down
+        return self.gear.up - self.gear.down
 
-    # Positive values facilitate.
-    # Negative values depress.
     def modulate(self, num: int):
-        # The granularity is a lower limit on the gear's up and down.
-        # Positive modulation decreases down then increases up.
-        # Negative modulation decreases up then increases down.
-        if self._gear.down == self.granularity:
-            up = self._gear.up + num
-            self._gear.up = max(self.granularity, min(self.granularity + self.limit, up))
+        """
+        Positive values for num cause more facilitation.
+        Negative values for num cause more depression.
+        """
 
+        # Apply the modulation to up if down is already at the minimum.
+        if self.gear.down == self.granularity:
+            up = self.gear.up + num
+            self.gear.up = max(self.granularity, min(self.granularity + self.limit, up))
+
+            # Apply the delta below the minimum up value to increase the down value if any.
             if up < self.granularity:
-                down = self._gear.down + self.granularity - up
-                self._gear.down = max(self.granularity, min(self.granularity + self.limit, down))
+                down = self.gear.down + self.granularity - up
+                self.gear.down = max(self.granularity, min(self.granularity + self.limit, down))
+        # Otherwise apply the modulation to down.
         else:
-            down = self._gear.down - num
-            self._gear.down = max(self.granularity, min(self.granularity + self.limit, down))
+            down = self.gear.down - num
+            self.gear.down = max(self.granularity, min(self.granularity + self.limit, down))
 
+            # Apply the delta below the minimum down value to increase the up value if any.
             if down < self.granularity:
-                up = self._gear.up + self.granularity - down
-                self._gear.up = max(self.granularity, min(self.granularity + self.limit, up))
+                up = self.gear.up + self.granularity - down
+                self.gear.up = max(self.granularity, min(self.granularity + self.limit, up))

@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field, InitVar
-from typing import Self
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Vector
 from sonin.model.signal import Signal
@@ -13,8 +14,7 @@ ACCEPTING = 0
 REFACTORY = 1
 
 
-@dataclass
-class TetanicPeriod:
+class TetanicPeriod(BaseModel):
     """ Represents a periodic schedule of tetanic activations """
 
     # Number of steps to begin tetanic activation
@@ -27,79 +27,59 @@ class TetanicPeriod:
     gap: int
 
     # True if dormant, False if within tetanus
-    _dormant: bool = field(init=False)
+    dormant: bool = True
 
     # Time of next flip between dormant and tetanus
-    _n_time: int = field(init=False)
+    n_time: int = None
 
-    def __post_init__(self):
-        self._dormant: bool = True
-        self._n_time: int = self.threshold
+    def model_post_init(self, context: Any, /):
+        self.n_time: int = self.threshold
 
     def step(self, c_time: int):
-        if self._dormant:
-            if c_time >= self._n_time:
-                self._dormant = False
-                self._n_time = c_time + self.activations * (self.gap + 1)
+        if self.dormant:
+            if c_time >= self.n_time:
+                self.dormant = False
+                self.n_time = c_time + self.activations * (self.gap + 1)
         else:
-            if c_time >= self._n_time:
-                self._dormant = True
-                self._n_time = c_time + self.threshold
+            if c_time >= self.n_time:
+                self.dormant = True
+                self.n_time = c_time + self.threshold
 
     def is_active(self, c_time) -> bool:
         """ Returns True if the neuron should fire """
-        return not self._dormant and (self._n_time - c_time) % (self.gap + 1) == 0
+        return not self.dormant and (self.n_time - c_time) % (self.gap + 1) == 0
 
 
-class NullTetanicPeriod(TetanicPeriod):
-    def __new__(cls, *args, **kwargs) -> Self:
-        if not hasattr(cls, "instance"):
-            cls.instance: NullTetanicPeriod = super().__new__(cls)
-
-        return cls.instance
-
-    def __init__(self):
-        pass
-
-    def step(self, _c_time: int):
-        pass
-
-    def is_active(self, _c_time) -> bool:
-        return False
-
-
-@dataclass
-class Axon:
+class Axon(BaseModel):
     position: Vector
-    n_dimension: InitVar[int]
-    dimension_size: InitVar[int]
-    signals: set[Signal] = field(default_factory=set)
-    direction: Vector = field(init=False)
+    n_dimension: int
+    dimension_size: int
+    signals: set[Signal] = Field(default_factory=set)
+    direction: Vector = None
 
-    def __post_init__(self, n_dimension: int, dimension_size: int):
+    def model_post_init(self, context: Any, /):
         # All axons start out pointing at the center. This helps differentiate
         # neurons and expose them to the most signals.
 
         direction = ()
 
-        for i in range(n_dimension):
+        for i in range(self.n_dimension):
             # Not halving the dimension_size because int division will not capture a center between points
             double = self.position.value[i] * 2
 
-            if double < dimension_size:
+            if double < self.dimension_size:
                 direction += (-1,)
-            elif double > dimension_size:
+            elif double > self.dimension_size:
                 direction += (1,)
             else:
                 direction += (0,)
 
-        assert len(direction) == n_dimension
+        assert len(direction) == self.n_dimension
 
-        self.direction = Vector(value=direction, dimension_size=dimension_size)
+        self.direction = Vector(value=direction, dimension_size=self.dimension_size)
 
 
-@dataclass
-class Neuron:
+class Neuron(BaseModel):
     # Vector of the neuron in the mind
     position: Vector
 
@@ -107,7 +87,7 @@ class Neuron:
     axon: Axon
 
     # The signals this neuron emits
-    signals: set[Signal] = field(default_factory=set)
+    signals: set[Signal] = Field(default_factory=set)
 
     # True if the neuron excites other neurons, False if it inhibits other neurons
     excites: bool = True
@@ -122,13 +102,13 @@ class Neuron:
     refactory_period: int = 0
 
     # Periodic activations without need for input potential
-    tetanic_period: TetanicPeriod = field(default_factory=lambda: NullTetanicPeriod())
+    tetanic_period: TetanicPeriod | None = None
 
     # Synapses connected to post neurons (output)
-    post_synapses: dict[int, Synapse] = field(default_factory=dict)
+    post_synapses: dict[int, Synapse] = Field(default_factory=dict)
 
     # Synapses connected to pre neurons (input)
-    pre_synapses: dict[int, Synapse] = field(default_factory=dict)
+    pre_synapses: dict[int, Synapse] = Field(default_factory=dict)
 
     # Current state of the neuron
     state: int = ACCEPTING
@@ -139,23 +119,19 @@ class Neuron:
     # Time at which to reactivate the neuron
     t_refactory_end: int = 0
 
-    stimulation: SnapBack = field(init=False)
+    stimulation: SnapBack = None
     stimulation_amount: int = 64
-    stimulation_restore_rate: InitVar[int] = 8
-    stimulation_restore_damper: InitVar[int] = 7
+    stimulation_restore_rate: int = 8
+    stimulation_restore_damper: int = 7
 
     # Effective range for each signal emitted by this neuron
-    effective_range: dict[Signal, int] = field(default_factory=dict)
+    effective_range: dict[Signal, int] = Field(default_factory=dict)
 
-    def __post_init__(
-        self,
-        stimulation_restore_rate: int,
-        stimulation_restore_damper: int,
-    ):
+    def model_post_init(self, context: Any, /):
         # Detects frequent activations
         self.stimulation = SnapBack(
-            restore_rate=stimulation_restore_rate,
-            restore_damper=stimulation_restore_damper,
+            restore_rate=self.stimulation_restore_rate,
+            restore_damper=self.stimulation_restore_damper,
         )
 
     @property
@@ -164,10 +140,12 @@ class Neuron:
 
     def step(self, c_time: int):
         self.stimulation.step()
-        self.tetanic_period.step(c_time)
+        self.tetanic_period and self.tetanic_period.step(c_time)
 
         if self.state == ACCEPTING:
-            if self.potential >= self.activation_level or self.tetanic_period.is_active(c_time):
+            is_tetanic = self.tetanic_period and self.tetanic_period.is_active(c_time)
+
+            if self.potential >= self.activation_level or is_tetanic:
                 self.activate(c_time)
         elif self.state == REFACTORY and c_time >= self.t_refactory_end:
             self.enable()

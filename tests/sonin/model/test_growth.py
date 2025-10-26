@@ -11,7 +11,7 @@ def test_growth_1():
         n_dimension=2,
         dimension_size=dimension_size,
         environment=[(1, 20, Vector(value=(0, 0), dimension_size=dimension_size))],
-        signal_profile=SignalProfile({
+        signal_profile=SignalProfile(affinities={
             1: {1: 5, 2: -10},
             2: {1: 0},
         }),
@@ -35,7 +35,7 @@ def test_growth_2():
         n_dimension=2,
         dimension_size=dimension_size,
         environment=[(1, 20, Vector(value=(0, 0), dimension_size=dimension_size))],
-        signal_profile=SignalProfile({
+        signal_profile=SignalProfile(affinities={
             1: {1: 5, 2: -10},
             2: {1: 0},
         }),
@@ -65,7 +65,7 @@ def test_growth_3():
             (1, 4, Vector(value=(0, 0), dimension_size=dimension_size)),
             (1, 1, Vector(value=(2, 2), dimension_size=dimension_size)),
         ],
-        signal_profile=SignalProfile({
+        signal_profile=SignalProfile(affinities={
             2: {1: 1},
         }),
     )

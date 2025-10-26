@@ -1,8 +1,9 @@
 # Cell fating differentiates neurons. We only concern ourselves with neurons since we can ignore biological hardware.
 # We need to represent not only the developing cells, but also the environment they develop within.
 
-from dataclasses import dataclass
 from typing import Callable, Self
+
+from pydantic import BaseModel
 
 from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import Level, Signal
@@ -15,7 +16,7 @@ type IsLower = bool
 type IsLeft = list[tuple[Signal, Threshold, IsLower]]
 
 
-class FateNode:
+class FateNode(BaseModel):
     def get_fate(self, signals: dict[Signal, Level]) -> "Fate":
         raise NotImplementedError("FateNode.get_fate")
 
@@ -23,7 +24,6 @@ class FateNode:
         raise NotImplementedError("FateNode.size")
 
 
-@dataclass
 class Fate(FateNode):
     """ The final configuration of a cell """
     excites: bool
@@ -32,7 +32,7 @@ class Fate(FateNode):
     stimulation_amount: int
     stimulation_restore_rate: int
     stimulation_restore_damper: int
-    tetanic_period: TetanicPeriod
+    tetanic_period: TetanicPeriod | None
 
     def get_fate(self, signals: dict[Signal, Level]) -> Self:
         return self
@@ -41,7 +41,6 @@ class Fate(FateNode):
         return 1
 
 
-@dataclass
 class BinaryFate(FateNode):
     """ A branch in a decision tree """
     left: FateNode
@@ -72,8 +71,7 @@ class BinaryFate(FateNode):
         return self.left.size() + self.right.size()
 
 
-@dataclass
-class FateTree:
+class FateTree(BaseModel):
     root: FateNode | None = None
 
     def get_fate(self, signals: dict[Signal, Level]) -> Fate | None:

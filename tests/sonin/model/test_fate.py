@@ -31,6 +31,19 @@ def fate(
         ),
     )
 
+
+def binary_fate(
+    left: FateNode,
+    right: FateNode,
+    is_left: IsLeft,
+):
+    return BinaryFate(
+        left=left,
+        right=right,
+        is_left=is_left,
+    )
+
+
 @mark.parametrize(
     "adds, expected",
     [
@@ -43,7 +56,7 @@ def fate(
                 ([], fate(activation_level=1), []),
                 ([(1, 1, True)], fate(activation_level=2), [True]),
             ],
-            BinaryFate(fate(activation_level=2), fate(activation_level=1), [(1, 1, True)]),
+            binary_fate(fate(activation_level=2), fate(activation_level=1), [(1, 1, True)]),
         ),
         (
             [
@@ -51,9 +64,9 @@ def fate(
                 ([(1, 1, True)], fate(activation_level=2), [True]),
                 ([(2, 1, True)], fate(activation_level=3), [False, True]),
             ],
-            BinaryFate(
+            binary_fate(
                 fate(activation_level=2),
-                BinaryFate(fate(activation_level=3), fate(activation_level=1), [(2, 1, True)]),
+                binary_fate(fate(activation_level=3), fate(activation_level=1), [(2, 1, True)]),
                 [(1, 1, True)],
             ),
         ),
@@ -77,39 +90,39 @@ def test_add(adds: list[tuple[IsLeft, Fate, list[bool]]], expected: Fate | Binar
         (None, [False], None),
         (fate(activation_level=1), [True], None),
         (fate(activation_level=1), [False], None),
-        (BinaryFate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]), [True], fate(activation_level=2)),
-        (BinaryFate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]), [False], fate(activation_level=1)),
+        (binary_fate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]), [True], fate(activation_level=2)),
+        (binary_fate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]), [False], fate(activation_level=1)),
         (
-            BinaryFate(
+            binary_fate(
                 fate(activation_level=1),
-                BinaryFate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
+                binary_fate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
                 [(1, 1, True)],
             ),
             [True],
-            BinaryFate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
+            binary_fate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
         ),
         (
-            BinaryFate(
+            binary_fate(
                 fate(activation_level=1),
-                BinaryFate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
+                binary_fate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
                 [(1, 1, True)],
             ),
             [False, True],
-            BinaryFate(fate(activation_level=1), fate(activation_level=3), [(1, 1, True)]),
+            binary_fate(fate(activation_level=1), fate(activation_level=3), [(1, 1, True)]),
         ),
         (
-            BinaryFate(
+            binary_fate(
                 fate(activation_level=1),
-                BinaryFate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
+                binary_fate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
                 [(1, 1, True)],
             ),
             [False, False],
-            BinaryFate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]),
+            binary_fate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]),
         ),
     ],
 )
 def test_remove(root: FateNode, is_next_left: list[bool], expected: Fate | BinaryFate):
-    tree = FateTree(root)
+    tree = FateTree(root=root)
     mock_is_next_left = Mock()
     mock_is_next_left.side_effect = is_next_left
     tree.remove(mock_is_next_left)

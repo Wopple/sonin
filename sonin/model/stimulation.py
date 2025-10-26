@@ -1,10 +1,11 @@
-from dataclasses import dataclass, field
+from typing import Any
+
+from pydantic import BaseModel
 
 from sonin.sonin_math import div
 
 
-@dataclass
-class SnapBack:
+class SnapBack(BaseModel):
     # The starting value and the value it snaps back to.
     baseline: int = 0
 
@@ -16,13 +17,13 @@ class SnapBack:
     # 0: snaps back all the way immediately
     restore_damper: int = 0
 
-    _value: int = field(init=False)
+    _value: int = None
 
-    def __post_init__(self):
-        # _value == 0 means it is at baseline.
+    def model_post_init(self, context: Any, /):
+        # value == 0 means it is at baseline.
         # Baseline adjustments happen transparently at get and set time.
         # The step math is easier with a virtual baseline of zero.
-        self._value: int = 0
+        self.value: int = 0
 
         assert self.restore_rate >= 1
         assert self.restore_damper >= 0

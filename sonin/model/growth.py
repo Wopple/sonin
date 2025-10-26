@@ -1,6 +1,7 @@
-from dataclasses import dataclass, field
 from itertools import groupby
-from typing import Generator
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Hypercube, Vector
 from sonin.model.signal import Signal, SignalCount, SignalProfile
@@ -16,11 +17,10 @@ SENDING = 1
 STABLE = 2
 
 
-@dataclass
-class StemCell:
+class StemCell(BaseModel):
     position: Vector
     state: int
-    signals: dict[Signal, SignalCount] = field(default_factory=dict)
+    signals: dict[Signal, SignalCount] = Field(default_factory=dict)
 
     def add_signals(self, signal: Signal, count: SignalCount):
         new_count = self.signals.get(signal, 0) + count
@@ -32,8 +32,7 @@ class StemCell:
             self.signals[signal] = new_count
 
 
-@dataclass
-class Incubator:
+class Incubator(BaseModel):
     n_dimension: int
     dimension_size: int
 
@@ -43,12 +42,15 @@ class Incubator:
     # defines the affinity between signals
     signal_profile: SignalProfile
 
-    cells: Hypercube[StemCell] = field(init=False)
+    cells: Hypercube[StemCell] = None
 
     # the hyper-edits of adjacent cells
-    adjacent_edits: list[list[int]] = field(init=False)
+    adjacent_edits: list[list[int]] = None
 
-    def __post_init__(self):
+    def model_post_init(self, context: Any, /):
+        assert self.cells is None
+        assert self.adjacent_edits is None
+
         self.cells = Hypercube(
             n_dimension=self.n_dimension,
             dimension_size=self.dimension_size,
@@ -73,6 +75,7 @@ class Incubator:
     def state_of(self, position: Vector) -> int:
         return self.cells.get(position).state
 
+    # consider handling each signal separately
     def incubate(self):
         """
         Signals push and pull on each other to move signals from SENDING cells to RECEIVING cells.

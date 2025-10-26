@@ -84,6 +84,7 @@ class UintMutagen(IntMutagen):
 
 
 class TetanicPeriodMutagen(Mutagen):
+    is_none: BoolMutagen
     threshold: UintMutagen
     activations: UintMutagen
     gap: UintMutagen
@@ -92,15 +93,18 @@ class TetanicPeriodMutagen(Mutagen):
     def model_post_init(self, context: Any, /):
         assert self.mutator is None
 
-        self.mutator = Mutator(mutagens=[self.threshold, self.activations, self.gap])
+        self.mutator = Mutator(mutagens=[self.is_none, self.threshold, self.activations, self.gap])
 
     @property
-    def value(self) -> TetanicPeriod:
-        return TetanicPeriod(
-            threshold=self.threshold.value,
-            activations=self.activations.value,
-            gap=self.gap.value,
-        )
+    def value(self) -> TetanicPeriod | None:
+        if self.is_none.value:
+            return None
+        else:
+            return TetanicPeriod(
+                threshold=self.threshold.value,
+                activations=self.activations.value,
+                gap=self.gap.value,
+            )
 
     def mutate(self, num_mutations: int):
         self.mutator.mutate(num_mutations)
@@ -138,7 +142,7 @@ class FateMutagen(Mutagen):
             stimulation_amount=self.stimulation_amount.value,
             stimulation_restore_rate=self.stimulation_restore_rate.value,
             stimulation_restore_damper=self.stimulation_restore_damper.value,
-            tetanic_period=self.tetanic_mutator.value,
+            tetanic_period=self.tetanic_period.value,
         )
 
     def mutate(self, num_mutations: int):
