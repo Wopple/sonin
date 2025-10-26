@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from typing import Callable, Self
 
+from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import Level, Signal
 
 type Threshold = int
@@ -11,7 +12,7 @@ type IsLower = bool
 
 # Represents a collection of predicates:
 #     "does the level of this `Signal` reach the `Threshold` from the direction indicated by `IsLower`?"
-type IsLeft = list[(Signal, Threshold, IsLower)]
+type IsLeft = list[tuple[Signal, Threshold, IsLower]]
 
 
 class FateNode:
@@ -31,9 +32,7 @@ class Fate(FateNode):
     stimulation_amount: int
     stimulation_restore_rate: int
     stimulation_restore_damper: int
-    tetanic_threshold: int
-    tetanic_activations: int
-    tetanic_gap: int
+    tetanic_period: TetanicPeriod
 
     def get_fate(self, signals: dict[Signal, Level]) -> Self:
         return self

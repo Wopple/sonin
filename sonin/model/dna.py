@@ -15,30 +15,30 @@ class Dna:
         facilitation_limit: int = 1,
     ):
         # Lower limit on the number of neurons in the hypercube
-        self._min_neurons: UintMutagen = UintMutagen(min_neurons, 1)
+        self._min_neurons: UintMutagen = UintMutagen(value=min_neurons, min_value=1)
 
         # Number of synapses per neuron
-        self._n_synapse: UintMutagen = UintMutagen(n_synapse, 1)
+        self._n_synapse: UintMutagen = UintMutagen(value=n_synapse, min_value=1)
 
         # Number of virtual spacial dimensions in a mind
-        self._n_dimension: UintMutagen = UintMutagen(n_dimension, 1, 5)
+        self._n_dimension: UintMutagen = UintMutagen(value=n_dimension, min_value=1, max_value=5)
 
         # Level at which a neuron activates
-        self._activation_level: UintMutagen = UintMutagen(activation_level, 1)
+        self._activation_level: UintMutagen = UintMutagen(value=activation_level, min_value=1)
 
         # Neurons cannot propagate more potential than this when activating
-        self._max_neuron_strength: UintMutagen = UintMutagen(max_neuron_strength, 1)
+        self._max_neuron_strength: UintMutagen = UintMutagen(value=max_neuron_strength, min_value=1)
 
         # Maximum city block distance an axon can reach away from the neuron
-        self._axon_range: UintMutagen = UintMutagen(axon_range, 1)
+        self._axon_range: UintMutagen = UintMutagen(value=axon_range, min_value=1)
 
         # Amount of time a neuron stays in the refactory state (min 1)
-        self._refactory_period: UintMutagen = UintMutagen(refactory_period)
+        self._refactory_period: UintMutagen = UintMutagen(value=refactory_period)
 
-        self._facilitation_granularity: UintMutagen = UintMutagen(facilitation_granularity, 1)
-        self._facilitation_limit: UintMutagen = UintMutagen(facilitation_limit, 1)
+        self._facilitation_granularity: UintMutagen = UintMutagen(value=facilitation_granularity, min_value=1)
+        self._facilitation_limit: UintMutagen = UintMutagen(value=facilitation_limit, min_value=1)
 
-        self.mutator: Mutator = Mutator([
+        self.mutator: Mutator = Mutator(mutagens=[
             self._min_neurons,
             self._n_synapse,
             self._n_dimension,

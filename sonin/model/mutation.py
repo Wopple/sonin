@@ -1,84 +1,81 @@
 from random import randint, shuffle
-from typing import ClassVar
+from typing import Any, ClassVar
 
+from pydantic import BaseModel, Field
+
+from sonin.model.fate import Fate
 from sonin.model.neuron import TetanicPeriod
+from sonin.sonin_random import rand_sign
 
 
-class Mutagen:
-    def __init__(self, occurrence_weight: int | None = None, deviation_weight: int | None = None):
-        # higher occurrence increases the chance of a mutation
-        self.occurrence_weight: int = occurrence_weight or 1
-
-        # higher deviation increases the impact of a mutation
-        self.deviation_weight: int = deviation_weight or 1
-
-        assert self.occurrence_weight >= 1
-        assert self.deviation_weight >= 1
+class Mutagen(BaseModel):
+    occurrence_weight: int = Field(default=1, ge=1)
+    deviation_weight: int = Field(default=1, ge=1)
 
     def mutate(self, num_mutations: int):
         raise NotImplementedError(f"{self.__class__.__name__}.mutate")
 
 
-class Mutator:
-    def __init__(self, mutagens: list[Mutagen]):
-        self.mutagens: list[Mutagen] = mutagens
+class Mutator(Mutagen):
+    mutagens: list[Mutagen]
+    mutagen_map: dict[int, Mutagen] = None
+    mutation_selector: list[int] = None
+
+    def model_post_init(self, context: Any, /):
+        assert self.mutagen_map is None
+        assert self.mutation_selector is None
+
         self.mutagen_map = {i: m for i, m in enumerate(self.mutagens)}
         self.mutation_selector = [i for i, m in self.mutagen_map.items() for _ in range(m.occurrence_weight)]
 
-    def mutate(self, num_mutations: int | None = None):
+    def mutate(self, num_mutations: int):
         assert num_mutations > 0
 
-        num_mutations = num_mutations or 1
+        # shuffle to make sure we get a proper randomized distribution especially for a small number of mutations
         shuffle(self.mutation_selector)
+
         mutations = {}
 
+        # distribute mutations among the mutagens based on occurrence weights
         for i in range(num_mutations):
             selection = self.mutation_selector[i % len(self.mutation_selector)]
+            mutations[selection] = mutations.get(selection, 0) + 1
 
-            if selection in mutations:
-                mutations[selection] += 1
-            else:
-                mutations[selection] = 1
-
+        # perform the distributed mutations
         for i, num in mutations.items():
             self.mutagen_map[i].mutate(num)
 
 
+class BoolMutagen(Mutagen):
+    value: bool
+
+    def mutate(self, num_mutations: int):
+        self.value = not self.value
+
+
 class IntMutagen(Mutagen):
+    value: int
+    min_value: int | None = None
+    max_value: int | None = None
+
     MIN: ClassVar[int] = -(2 ** 63)
     MAX: ClassVar[int] = 2 ** 63 - 1
 
-    def __init__(
-        self,
-        value: int,
-        min_value: int | None = None,
-        max_value: int | None = None,
-        occurrence_weight: int | None = None,
-        deviation_weight: int | None = None,
-    ):
-        super().__init__(
-            occurrence_weight=occurrence_weight,
-            deviation_weight=deviation_weight,
-        )
-
-        self._value: int = value
-        self.min_value: int = max(min_value or self.MIN, self.MIN)
-        self.max_value: int = min(max_value or self.MAX, self.MAX)
+    def model_post_init(self, context: Any, /):
+        self.min_value = max(self.min_value or self.MIN, self.MIN)
+        self.max_value = min(self.max_value or self.MAX, self.MAX)
+        self.clip_value()
 
         assert self.MIN <= self.min_value <= self.value <= self.max_value <= self.MAX
 
-    @property
-    def value(self) -> int:
-        return self._value
-
-    @value.setter
-    def value(self, value: int):
-        self._value = max(self.min_value, min(self.max_value, value))
-
     def mutate(self, num_mutations: int):
-        sign = randint(0, 1) * 2 - 1
+        sign = rand_sign()
         deviation = randint(1, self.deviation_weight * num_mutations)
         self.value += sign * deviation
+        self.clip_value()
+
+    def clip_value(self):
+        self.value = max(self.min_value, min(self.max_value, self.value))
 
 
 class UintMutagen(IntMutagen):
@@ -87,27 +84,62 @@ class UintMutagen(IntMutagen):
 
 
 class TetanicPeriodMutagen(Mutagen):
-    def __init__(
-        self,
-        threshold: UintMutagen,
-        activations: UintMutagen,
-        gap: UintMutagen,
-        occurrence_weight: int | None = None,
-        deviation_weight: int | None = None,
-    ):
-        super().__init__(
-            occurrence_weight=occurrence_weight,
-            deviation_weight=deviation_weight,
-        )
+    threshold: UintMutagen
+    activations: UintMutagen
+    gap: UintMutagen
+    mutator: Mutator = None
 
-        self._threshold: UintMutagen = threshold
-        self._activations: UintMutagen = activations
-        self._gap: UintMutagen = gap
-        self._mutator: Mutator = Mutator([threshold, activations, gap])
+    def model_post_init(self, context: Any, /):
+        assert self.mutator is None
+
+        self.mutator = Mutator(mutagens=[self.threshold, self.activations, self.gap])
 
     @property
-    def value(self) -> int:
-        return TetanicPeriod()
+    def value(self) -> TetanicPeriod:
+        return TetanicPeriod(
+            threshold=self.threshold.value,
+            activations=self.activations.value,
+            gap=self.gap.value,
+        )
 
     def mutate(self, num_mutations: int):
-        self._mutator.mutate(num_mutations)
+        self.mutator.mutate(num_mutations)
+
+
+class FateMutagen(Mutagen):
+    excites: BoolMutagen
+    activation_level: UintMutagen
+    refactory_period: UintMutagen
+    stimulation_amount: UintMutagen
+    stimulation_restore_rate: UintMutagen
+    stimulation_restore_damper: UintMutagen
+    tetanic_period: TetanicPeriodMutagen
+    mutator: Mutator = None
+
+    def model_post_init(self, context: Any, /):
+        assert self.mutator is None
+
+        self.mutator = Mutator(mutagens=[
+            self.excites,
+            self.activation_level,
+            self.refactory_period,
+            self.stimulation_amount,
+            self.stimulation_restore_rate,
+            self.stimulation_restore_damper,
+            self.tetanic_period,
+        ])
+
+    @property
+    def value(self) -> Fate:
+        return Fate(
+            excites=self.excites.value,
+            activation_level=self.activation_level.value,
+            refactory_period=self.refactory_period.value,
+            stimulation_amount=self.stimulation_amount.value,
+            stimulation_restore_rate=self.stimulation_restore_rate.value,
+            stimulation_restore_damper=self.stimulation_restore_damper.value,
+            tetanic_period=self.tetanic_mutator.value,
+        )
+
+    def mutate(self, num_mutations: int):
+        self.mutator.mutate(num_mutations)

@@ -3,6 +3,7 @@ from unittest.mock import Mock
 from pytest import mark
 
 from sonin.model.fate import BinaryFate, Fate, FateNode, FateTree, IsLeft
+from sonin.model.neuron import TetanicPeriod
 
 
 def fate(
@@ -23,9 +24,11 @@ def fate(
         stimulation_amount=stimulation_amount,
         stimulation_restore_rate=stimulation_restore_rate,
         stimulation_restore_damper=stimulation_restore_damper,
-        tetanic_threshold=tetanic_threshold,
-        tetanic_activations=tetanic_activations,
-        tetanic_gap=tetanic_gap,
+        tetanic_period=TetanicPeriod(
+            threshold=tetanic_threshold,
+            activations=tetanic_activations,
+            gap=tetanic_gap,
+        ),
     )
 
 @mark.parametrize(
