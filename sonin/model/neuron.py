@@ -73,7 +73,7 @@ class Neuron(BaseModel):
     axon: Axon
 
     # The signals this neuron emits
-    signals: set[Signal] = Field(default_factory=set)
+    signals: dict[Signal, SignalCount] = Field(default_factory=set)
 
     # True if the neuron excites other neurons, False if it inhibits other neurons
     excites: bool = True

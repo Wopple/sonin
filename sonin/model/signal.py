@@ -8,9 +8,6 @@ type Signal = int
 # Number of signals
 type SignalCount = int
 
-# How much of a signal a neuron is exposed to. Affects fate determination.
-type Level = int
-
 # Degree of attraction between signals. Negative values are repulsive.
 type Affinity = int
 

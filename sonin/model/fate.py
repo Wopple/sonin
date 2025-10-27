@@ -6,19 +6,19 @@ from typing import Callable, Self
 from pydantic import BaseModel, Field
 
 from sonin.model.neuron import TetanicPeriod
-from sonin.model.signal import Level, Signal, SignalCount
+from sonin.model.signal import Signal, SignalCount
 from sonin.model.stimulation import Stimulation
 
 type Threshold = int
 type IsLower = bool
 
 # Represents a collection of predicates:
-#     "does the level of this `Signal` reach the `Threshold` from the direction indicated by `IsLower`?"
+#     "does the count of this `Signal` meet the `Threshold` in the direction indicated by `IsLower`?"
 type IsLeft = list[tuple[Signal, Threshold, IsLower]]
 
 
 class FateNode(BaseModel):
-    def get_fate(self, signals: dict[Signal, Level]) -> "Fate":
+    def get_fate(self, signals: dict[Signal, SignalCount]) -> "Fate":
         raise NotImplementedError("FateNode.get_fate")
 
     def size(self) -> int:
@@ -35,7 +35,7 @@ class Fate(FateNode):
     stimulation: Stimulation
     tetanic_period: TetanicPeriod | None
 
-    def get_fate(self, signals: dict[Signal, Level]) -> Self:
+    def get_fate(self, signals: dict[Signal, SignalCount]) -> Self:
         return self
 
     def size(self) -> int:
@@ -59,10 +59,10 @@ class BinaryFate(FateNode):
         else:
             yield self.right
 
-    def get_fate(self, signals: dict[Signal, Level]) -> Fate:
+    def get_fate(self, signals: dict[Signal, SignalCount]) -> Fate:
         if all(
-            signals[signal] >= level if is_lower else signals[signal] <= level
-            for signal, level, is_lower in self.is_left
+            signals.get(signal, 0) <= threshold if is_lower else signals.get(signal, 0) >= threshold
+            for signal, threshold, is_lower in self.is_left
         ):
             return self.left.get_fate(signals)
         else:
@@ -75,7 +75,7 @@ class BinaryFate(FateNode):
 class FateTree(BaseModel):
     root: FateNode | None = None
 
-    def get_fate(self, signals: dict[Signal, Level]) -> Fate | None:
+    def get_fate(self, signals: dict[Signal, SignalCount]) -> Fate | None:
         return self.root.get_fate(signals) if self.root is not None else None
 
     def find_child_and_parents(self, is_next_left: Callable[[], bool]):

@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Hypercube, Vector
 from sonin.model.neuron import ACCEPTING, Axon, Neuron
-from sonin.model.signal import SignalProfile
+from sonin.model.signal import Signal, SignalCount, SignalProfile
 from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.model.synapse import Synapse
 from sonin.sonin_math import div
@@ -57,34 +57,8 @@ class Mind(BaseModel):
     dimension_size: int
     max_neuron_strength: int
     axon_range: int
-    neurons: Hypercube[Neuron] = None
+    neurons: Hypercube[Neuron]
     signal_profile: SignalProfile = Field(default_factory=SignalProfile)
-
-    def model_post_init(self, context: Any, /):
-        assert self.neurons is None
-
-        self.neurons = Hypercube(
-            n_dimension=self.n_dimension,
-            dimension_size=self.dimension_size,
-        )
-
-    def initialize(self, activation_level: int, refactory_period: int):
-        self.neurons.initialize(lambda position: Neuron(
-            position=position,
-            axon=Axon(position=position, n_dimension=self.n_dimension, dimension_size=self.dimension_size),
-            activation_level=activation_level,
-            refactory_period=refactory_period,
-            stimulation=Stimulation(
-                amount=64,
-                snap_back=SnapBack(
-                    baseline=0,
-                    restore_rate=8,
-                    restore_damper=7,
-                ),
-            ),
-        ))
-
-        self.guide_axons()
 
     def random_position(self, center: Vector, distance: int) -> Vector:
         """
@@ -118,9 +92,9 @@ class Mind(BaseModel):
                 n.potential = 0
 
     def guide_axons(self):
-        all_signals = [
-            (signal, n.position, n.effective_range.get(signal, self.n_dimension * self.dimension_size))
-            for n in self.neurons for signal in n.signals
+        all_signals: list[tuple[Signal, SignalCount, Vector, int]] = [
+            (signal, signal_count, n.position, n.effective_range.get(signal, self.n_dimension * self.dimension_size))
+            for n in self.neurons for signal, signal_count in n.signals.items()
         ]
 
         for n in self.neurons:
@@ -140,7 +114,7 @@ class Mind(BaseModel):
                 )
 
                 # Sum the attractive effects between the signals
-                for guide_signal, location, effective_range in all_signals:
+                for guide_signal, guide_signal_count, location, effective_range in all_signals:
                     distance = location.city_distance(axon_position)
 
                     # do not apply signals out of range
