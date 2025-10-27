@@ -52,7 +52,7 @@ def test_int_mutagen(
     seed(seed_value)
 
     mutagen = IntMutagen(
-        value=value,
+        int_value=value,
         min_value=min_value,
         max_value=max_value,
         deviation_weight=deviation_weight,
@@ -111,7 +111,7 @@ def test_uint_mutagen(
     seed(seed_value)
 
     mutagen = UintMutagen(
-        value=value,
+        int_value=value,
         min_value=min_value,
         max_value=max_value,
         deviation_weight=deviation_weight,

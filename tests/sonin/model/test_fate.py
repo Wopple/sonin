@@ -4,13 +4,17 @@ from pytest import mark
 
 from sonin.model.fate import BinaryFate, Fate, FateNode, FateTree, IsLeft
 from sonin.model.neuron import TetanicPeriod
+from sonin.model.signal import Signal, SignalCount
+from sonin.model.stimulation import SnapBack, Stimulation
 
 
 def fate(
     excites: bool = True,
+    axon_signals: dict[Signal, SignalCount] | None = None,
     activation_level: int = 1,
     refactory_period: int = 0,
     stimulation_amount: int = 1,
+    stimulation_baseline: int = 0,
     stimulation_restore_rate: int = 2,
     stimulation_restore_damper: int = 1,
     tetanic_threshold: int = 0,
@@ -19,11 +23,17 @@ def fate(
 ):
     return Fate(
         excites=excites,
+        axon_signals=axon_signals or {},
         activation_level=activation_level,
         refactory_period=refactory_period,
-        stimulation_amount=stimulation_amount,
-        stimulation_restore_rate=stimulation_restore_rate,
-        stimulation_restore_damper=stimulation_restore_damper,
+        stimulation=Stimulation(
+            amount=stimulation_amount,
+            snap_back=SnapBack(
+                baseline=stimulation_baseline,
+                restore_rate=stimulation_restore_rate,
+                restore_damper=stimulation_restore_damper,
+            ),
+        ),
         tetanic_period=TetanicPeriod(
             threshold=tetanic_threshold,
             activations=tetanic_activations,

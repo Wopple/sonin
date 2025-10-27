@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from sonin.sonin_math import div
 
@@ -11,11 +11,11 @@ class SnapBack(BaseModel):
 
     # Higher values create a faster snap back
     # 1: no snap back adjustment
-    restore_rate: int = 1
+    restore_rate: int = Field(default=1, ge=1)
 
     # Higher values create a slower snap back
     # 0: snaps back all the way immediately
-    restore_damper: int = 0
+    restore_damper: int = Field(default=0, ge=0)
 
     _value: int = None
 
@@ -40,3 +40,24 @@ class SnapBack(BaseModel):
     def step(self):
         if self._value != 0:
             self._value = div(self._value * self.restore_damper, self.restore_rate)
+
+
+class Stimulation(BaseModel):
+    # Value increment on each stimulation
+    amount: int = Field(default=1, ge=1)
+
+    snap_back: SnapBack = Field(default_factory=SnapBack)
+
+    @property
+    def value(self) -> int:
+        return self.snap_back.value
+
+    @value.setter
+    def value(self, value):
+        self.snap_back.value = value
+
+    def step(self):
+        self.snap_back.step()
+
+    def stimulate(self):
+        self.snap_back._value += self.amount

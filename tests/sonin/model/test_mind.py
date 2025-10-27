@@ -4,6 +4,7 @@ from sonin.model.dna import Dna
 from sonin.model.hypercube import Vector
 from sonin.model.mind import strengthen_connection, weaken_connection
 from sonin.model.neuron import Axon, Neuron
+from sonin.model.stimulation import Stimulation
 
 
 @fixture
@@ -18,25 +19,27 @@ def dna(n_dimension: int) -> Dna:
 
 @fixture
 def neuron_1(dna: Dna) -> Neuron:
-    position = Vector(value=(0,), dimension_size=dna.n_dimension)
+    position = Vector.of((0,), dna.dimension_size)
 
     return Neuron(
         position=position,
         axon=Axon(position=position, n_dimension=dna.n_dimension, dimension_size=dna.dimension_size),
         activation_level=dna.activation_level,
         refactory_period=dna.refactory_period,
+        stimulation=Stimulation(),
     )
 
 
 @fixture
 def neuron_2(dna: Dna) -> Neuron:
-    position = Vector(value=(1,), dimension_size=dna.n_dimension)
+    position = Vector.of((1,), dna.dimension_size)
 
     return Neuron(
         position=position,
         axon=Axon(position=position, n_dimension=dna.n_dimension, dimension_size=dna.dimension_size),
         activation_level=dna.activation_level,
         refactory_period=dna.refactory_period,
+        stimulation=Stimulation(),
     )
 
 

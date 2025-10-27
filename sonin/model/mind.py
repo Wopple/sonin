@@ -1,4 +1,4 @@
-from random import choice, randint
+from random import randint
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from sonin.model.hypercube import Hypercube, Vector
 from sonin.model.neuron import ACCEPTING, Axon, Neuron
 from sonin.model.signal import SignalProfile
+from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.model.synapse import Synapse
 from sonin.sonin_math import div
 
@@ -73,6 +74,14 @@ class Mind(BaseModel):
             axon=Axon(position=position, n_dimension=self.n_dimension, dimension_size=self.dimension_size),
             activation_level=activation_level,
             refactory_period=refactory_period,
+            stimulation=Stimulation(
+                amount=64,
+                snap_back=SnapBack(
+                    baseline=0,
+                    restore_rate=8,
+                    restore_damper=7,
+                ),
+            ),
         ))
 
         self.guide_axons()
@@ -136,12 +145,15 @@ class Mind(BaseModel):
 
                     # do not apply signals out of range
                     if distance <= effective_range:
-                        for growth_signal in growth_signals:
+                        for growth_signal, growth_signal_count in growth_signals.items():
                             degree_of_attraction = self.signal_profile.attraction(growth_signal, guide_signal)
 
                             # TODO: use the method from SignalProfile
                             # dividing by distance to weaken farther signals
-                            attraction += div((location - axon_position) * degree_of_attraction, distance)
+                            attraction += div(
+                                (location - axon_position) * degree_of_attraction * growth_signal_count,
+                                distance,
+                            )
 
                 # Stop if the net attraction is zero
                 if all(c == 0 for c in attraction.value):
@@ -167,15 +179,35 @@ class Mind(BaseModel):
         for n in self.neurons:
             n.step(c_time)
 
-            if n.stimulation.value > 100 and len(n.pre_synapses) > 0:
+            # prevent overstimulation
+            if n.stimulation and n.stimulation.value > 100 and len(n.pre_synapses) > 0:
                 n.stimulation.value = 0
-                syn: Synapse = choice(list(n.pre_synapses.values()))
+                pre_syns = list(n.pre_synapses.values())
 
-                weaken_connection(
-                    pre_neuron=self.neurons.get(syn.pre_neuron),
-                    post_neuron=n,
-                    strength=div(self.max_neuron_strength, 2),
-                )
+                # find the input neuron with the most stimulation to maximize the effect
+                most_stimulated_pre_n = self.neurons.get(pre_syns[0].pre_neuron)
+
+                for s in pre_syns[1:]:
+                    candidate = self.neurons.get(s.pre_neuron)
+
+                    if candidate.stimulation.value > most_stimulated_pre_n.stimulation.value:
+                        most_stimulated_pre_n = candidate
+
+                # weaken the connection if it excites
+                if most_stimulated_pre_n.excites:
+                    weaken_connection(
+                        pre_neuron=most_stimulated_pre_n,
+                        post_neuron=n,
+                        strength=div(self.max_neuron_strength, 2),
+                    )
+                # strengthen the connection if it depresses
+                else:
+                    strengthen_connection(
+                        pre_neuron=most_stimulated_pre_n,
+                        post_neuron=n,
+                        strength=div(self.max_neuron_strength, 2),
+                        max_strength=self.max_neuron_strength,
+                    )
 
         for n in self.neurons:
             if n.activated:

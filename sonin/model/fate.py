@@ -3,10 +3,11 @@
 
 from typing import Callable, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from sonin.model.neuron import TetanicPeriod
-from sonin.model.signal import Level, Signal
+from sonin.model.signal import Level, Signal, SignalCount
+from sonin.model.stimulation import Stimulation
 
 type Threshold = int
 type IsLower = bool
@@ -26,12 +27,12 @@ class FateNode(BaseModel):
 
 class Fate(FateNode):
     """ The final configuration of a cell """
+
     excites: bool
-    activation_level: int
-    refactory_period: int
-    stimulation_amount: int
-    stimulation_restore_rate: int
-    stimulation_restore_damper: int
+    axon_signals: dict[Signal, SignalCount]
+    activation_level: int = Field(ge=1)
+    refactory_period: int = Field(ge=0)
+    stimulation: Stimulation
     tetanic_period: TetanicPeriod | None
 
     def get_fate(self, signals: dict[Signal, Level]) -> Self:

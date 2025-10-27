@@ -3,8 +3,8 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Vector
-from sonin.model.signal import Signal
-from sonin.model.stimulation import SnapBack
+from sonin.model.signal import Signal, SignalCount
+from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.model.synapse import Synapse
 
 # Will accept potential from pre-synaptic neurons
@@ -54,29 +54,15 @@ class Axon(BaseModel):
     position: Vector
     n_dimension: int
     dimension_size: int
-    signals: set[Signal] = Field(default_factory=set)
+    signals: dict[Signal, SignalCount] = Field(default_factory=dict)
     direction: Vector = None
 
     def model_post_init(self, context: Any, /):
         # All axons start out pointing at the center. This helps differentiate
         # neurons and expose them to the most signals.
-
-        direction = ()
-
-        for i in range(self.n_dimension):
-            # Not halving the dimension_size because int division will not capture a center between points
-            double = self.position.value[i] * 2
-
-            if double < self.dimension_size:
-                direction += (-1,)
-            elif double > self.dimension_size:
-                direction += (1,)
-            else:
-                direction += (0,)
-
-        assert len(direction) == self.n_dimension
-
-        self.direction = Vector(value=direction, dimension_size=self.dimension_size)
+        double_center = Vector.of(tuple(self.dimension_size - 1 for _ in range(self.n_dimension)), self.dimension_size)
+        double_position = self.position * 2
+        self.direction = (double_center - double_position).city_unit()
 
 
 class Neuron(BaseModel):
@@ -96,10 +82,10 @@ class Neuron(BaseModel):
     potential: int = 0
 
     # Potential threshold for activation
-    activation_level: int = 1
+    activation_level: int = Field(default=1, ge=1)
 
     # Number of dormant steps after activation
-    refactory_period: int = 0
+    refactory_period: int = Field(default=0, ge=0)
 
     # Periodic activations without need for input potential
     tetanic_period: TetanicPeriod | None = None
@@ -119,20 +105,10 @@ class Neuron(BaseModel):
     # Time at which to reactivate the neuron
     t_refactory_end: int = 0
 
-    stimulation: SnapBack = None
-    stimulation_amount: int = 64
-    stimulation_restore_rate: int = 8
-    stimulation_restore_damper: int = 7
+    stimulation: Stimulation
 
     # Effective range for each signal emitted by this neuron
     effective_range: dict[Signal, int] = Field(default_factory=dict)
-
-    def model_post_init(self, context: Any, /):
-        # Detects frequent activations
-        self.stimulation = SnapBack(
-            restore_rate=self.stimulation_restore_rate,
-            restore_damper=self.stimulation_restore_damper,
-        )
 
     @property
     def inhibits(self) -> bool:
@@ -154,7 +130,7 @@ class Neuron(BaseModel):
         self.state = ACCEPTING
 
     def activate(self, c_time: int):
-        self.stimulation.value += self.stimulation_amount
+        self.stimulation.stimulate()
         self.potential = 0
         self.activated = True
 
