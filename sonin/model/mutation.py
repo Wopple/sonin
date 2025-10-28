@@ -1,15 +1,14 @@
 from itertools import count
-from random import choice, randint, shuffle
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, Field
 
 from sonin.model.facilitation import Facilitation
-from sonin.model.fate import Fate
+from sonin.model.fate import BinaryFate, Fate, IsLeft, IsLower
 from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import Signal, SignalProfile
 from sonin.model.stimulation import SnapBack, Stimulation
-from sonin.sonin_random import rand_sign
+from sonin.sonin_random import choice, rand_bool, rand_int, rand_sign, shuffle
 
 
 class Mutable:
@@ -88,7 +87,7 @@ class IntMutagen(Mutagen):
 
     def mutate(self, num_mutations: int):
         sign = rand_sign()
-        deviation = randint(1, self.deviation_weight * num_mutations)
+        deviation = rand_int(1, self.deviation_weight * num_mutations)
         self.int_value += sign * deviation
         self.clip_value()
 
@@ -151,30 +150,33 @@ class SignalValueMutagen(Mutagen):
 
         for _ in range(num_mutations):
             mutator.mutate(1)
-            delta = randint(1, self.deviation_weight)
+            delta = rand_int(1, self.deviation_weight)
 
             if not self.signal_counts or add_new.value:
                 # add a random new signal preferring small numbers
                 add_new.bool_value = False
-
-                for new_signal in count():
-                    if new_signal not in self.signal_counts and randint(0, 1) == 0:
-                        self.signal_counts[new_signal] = delta
-                        break
+                self.signal_counts[self.new_key()] = delta
             elif add_old.value:
                 # add to a random existing signal
                 add_old.bool_value = False
-                signal = choice(tuple(self.signal_counts.keys()))
+                signal = choice(self.signal_counts.keys())
                 self.signal_counts[signal] += delta
             elif sub.value:
                 # subtract from a random existing signal
                 sub.bool_value = False
-                signal = choice(tuple(self.signal_counts.keys()))
+                signal = choice(self.signal_counts.keys())
 
                 if delta < self.signal_counts[signal]:
                     self.signal_counts[signal] -= delta
                 else:
                     del self.signal_counts[signal]
+
+    def new_key(self) -> Signal:
+        for new_signal in count():
+            if new_signal not in self.signal_counts and rand_bool():
+                return new_signal
+
+        raise RuntimeError("unreachable")
 
 
 class SignalProfileMutagen(Mutagen):
@@ -213,21 +215,18 @@ class SignalProfileMutagen(Mutagen):
                 # add a random new signal preferring small numbers
                 add.bool_value = False
 
-                for new_signal in count():
-                    if new_signal not in self.affinities and randint(0, 1) == 0:
-                        mutagen = SignalValueMutagen(
-                            add_old_weight=self.add_old_weight,
-                            add_new_weight=self.add_new_weight,
-                            sub_weight=self.sub_weight,
-                        )
+                mutagen = SignalValueMutagen(
+                    add_old_weight=self.add_old_weight,
+                    add_new_weight=self.add_new_weight,
+                    sub_weight=self.sub_weight,
+                )
 
-                        mutagen.mutate(1)
-                        self.affinities[new_signal] = mutagen
-                        break
+                mutagen.mutate(1)
+                self.affinities[self.new_key()] = mutagen
             elif update.value:
                 # update a random existing signal
                 update.bool_value = False
-                signal = choice(tuple(self.affinities.keys()))
+                signal = choice(self.affinities.keys())
                 self.affinities[signal].mutate(1)
 
                 if not self.affinities[signal].signal_counts:
@@ -235,8 +234,15 @@ class SignalProfileMutagen(Mutagen):
             elif remove.value:
                 # remove a random existing signal
                 remove.bool_value = False
-                signal = choice(tuple(self.affinities.keys()))
+                signal = choice(self.affinities.keys())
                 del self.affinities[signal]
+
+    def new_key(self) -> Signal:
+        for new_signal in count():
+            if new_signal not in self.affinities and rand_bool():
+                return new_signal
+
+        raise RuntimeError("unreachable")
 
 
 class FacilitationMutagen(Mutagen):

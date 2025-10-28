@@ -1,14 +1,11 @@
-from random import randint
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Hypercube, Vector
-from sonin.model.neuron import ACCEPTING, Axon, Neuron
+from sonin.model.neuron import ACCEPTING, Neuron
 from sonin.model.signal import Signal, SignalCount, SignalProfile
-from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.model.synapse import Synapse
 from sonin.sonin_math import div
+from sonin.sonin_random import rand_bool, rand_int
 
 
 def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int, max_strength: int):
@@ -65,7 +62,7 @@ class Mind(BaseModel):
         Returns a vector within `distance` city blocks from the center wrapping at the dimension size.
         """
         def random_component(idx: int) -> int:
-            return (center.value[idx] + randint(-distance, distance)) % self.dimension_size
+            return (center.value[idx] + rand_int(-distance, distance)) % self.dimension_size
 
         return Vector(
             value=tuple(random_component(idx) for idx in range(self.n_dimension)),
@@ -86,7 +83,7 @@ class Mind(BaseModel):
 
     def randomize_potential(self):
         for n in self.neurons:
-            if randint(0, 1):
+            if rand_bool():
                 n.potential = n.activation_level
             else:
                 n.potential = 0

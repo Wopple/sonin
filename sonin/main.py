@@ -1,5 +1,3 @@
-from random import seed
-
 from sonin.model.dna import Dna
 from sonin.model.fate import BinaryFate, Fate, FateTree
 from sonin.model.growth import Incubator
@@ -8,6 +6,7 @@ from sonin.model.mind import Mind
 from sonin.model.neuron import Axon, Neuron, TetanicPeriod
 from sonin.model.signal import Signal, SignalCount, SignalProfile
 from sonin.model.stimulation import SnapBack, Stimulation
+from sonin.sonin_random import seed
 
 # Rules
 #   Conceptually, neurons and synapses are agents making decisions on their own based on interactions and environment.
@@ -129,7 +128,7 @@ from sonin.model.stimulation import SnapBack, Stimulation
 #     - Synapse > Vector
 #     - Facilitation > Gear
 
-seed(0)
+seed(1)
 
 dna = Dna(
     min_neurons=100,
@@ -226,10 +225,10 @@ fate_2 = Fate(
 binary_fate_1 = BinaryFate(
     left=fate_1,
     right=fate_2,
-    is_left=[
-        (1, 20, True),
-        (2, 1, False),
-    ],
+    is_left={
+        (1, True): 20,
+        (2, False): 1,
+    },
 )
 
 fate_tree = FateTree(root=binary_fate_1)
@@ -283,10 +282,6 @@ for i, n in enumerate(input_neurons):
     )
 
 
-def print_neurons(msg: str, neurons: list[Neuron]):
-    print(f'{msg}: {[(n.potential, n.stimulation.value) for n in neurons]}')
-
-
 def plot_synapses():
     import matplotlib.pyplot as plt
 
@@ -310,13 +305,7 @@ def plot_synapses():
     plt.show()
 
 
-print_neurons('input', input_neurons)
-print_neurons('output', output_neurons)
-
 for i in range(100):
     mind.step(i)
-    print()
-    print_neurons('input', input_neurons)
-    print_neurons('output', output_neurons)
 
 plot_synapses()
