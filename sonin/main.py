@@ -91,13 +91,14 @@ from sonin.model.stimulation import SnapBack, Stimulation
 #     - Concentration gradients can have thresholds that affect the fate of cells.
 #     - Sequential induction can affect the fate of cells through one of the signaling mechanisms to neighbors.
 #     - Can develop new signals by cloning successful signals and varying them independently.
-#     - Could be fine to define signal exposure to be proportional to distance rather than inversely proportional.
+#     + Signal exposure is inversely proportional to distance.
 #     - Local signals could have a maximum range and be all or nothing.
 #
 #   - Axon guidance is affected by:
-#     - both attractive and repulsive forces
-#     - both near and far factors
-#     - guidance cells
+#     + both attractive and repulsive forces
+#     - near factors
+#     + far factors
+#     + guidance cells (implemented as signals from cell division)
 #     - following existing axons
 #
 #   - Synapses will compete and favor the more active one.
@@ -113,7 +114,6 @@ from sonin.model.stimulation import SnapBack, Stimulation
 
 # Tests
 #   - Weighted suite of tests
-#
 #   - Monkey test: resilient in the presence of change
 
 # Model

@@ -57,7 +57,7 @@ class Incubator(BaseModel):
         )
 
         self.adjacent_edits = []
-        base = [0 for _ in range(self.n_dimension)]
+        base = [0] * self.n_dimension
 
         for idx in range(self.n_dimension):
             for e in (-1, 1):
@@ -155,7 +155,7 @@ class Incubator(BaseModel):
             for send, receives in sending_cell_channels:
                 # get adjacent receiving position if it exists in the direction indicated by `positive`
                 def receive_by_dimension(dimension: int, positive: bool) -> Vector | None:
-                    edit: list[int] = [0 for _ in range(self.n_dimension)]
+                    edit: list[int] = [0] * self.n_dimension
                     edit[dimension] = 1 if positive else -1
                     adjacent_position = send.position + edit
 

@@ -108,10 +108,7 @@ class Mind(BaseModel):
             while axon_position not in past_positions:
                 past_positions.add(axon_position)
 
-                attraction = Vector(
-                    value=tuple(0 for _ in range(self.n_dimension)),
-                    dimension_size=self.dimension_size,
-                )
+                attraction = Vector.of((0,) * self.n_dimension, self.dimension_size)
 
                 # Sum the attractive effects between the signals
                 for guide_signal, guide_signal_count, guide_position, effective_range in all_signals:

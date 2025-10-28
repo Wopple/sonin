@@ -38,9 +38,7 @@ class SignalProfile(BaseModel):
         distance = this_position.city_distance(that_position)
 
         if distance == 0:
-            return Vector(
-                value=tuple(0 for _ in range(this_position.n_dimension))
-            )
+            return Vector.of((0,) * this_position.n_dimension)
 
         direction = that_position - this_position
 

@@ -60,7 +60,7 @@ class Axon(BaseModel):
     def model_post_init(self, context: Any, /):
         # All axons start out pointing at the center. This helps differentiate
         # neurons and expose them to the most signals.
-        double_center = Vector.of(tuple(self.dimension_size - 1 for _ in range(self.n_dimension)), self.dimension_size)
+        double_center = Vector.of((self.dimension_size - 1,) * self.n_dimension, self.dimension_size)
         double_position = self.position * 2
         self.direction = (double_center - double_position).city_unit()
 

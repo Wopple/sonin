@@ -160,7 +160,7 @@ class Vector(BaseModel):
         largest = max(abs(c) for c in self.value)
 
         if largest == 0:
-            return Vector.of(tuple(0 for _ in range(self.n_dimension)), self.dimension_size)
+            return Vector.of((0,) * self.n_dimension, self.dimension_size)
 
         # This algorithm will be close and usually correct, but not always.
         # This algorithm can be improved if necessary by checking the adjacent
@@ -214,7 +214,7 @@ class Hypercube[T](BaseModel):
 
         # for even dimension sizes, this is the corner with the smallest indices
         center = Vector.of(
-            tuple(div(self.dimension_size - 1, 2) for _ in range(self.n_dimension)),
+            (div(self.dimension_size - 1, 2),) * self.n_dimension,
             self.dimension_size,
         )
 
