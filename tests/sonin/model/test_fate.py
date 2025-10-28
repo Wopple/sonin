@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 from pytest import mark
 
-from sonin.model.fate import BinaryFate, Fate, FateNode, FateTree, IsLeft, Threshold
+from sonin.model.fate import BinaryFate, Fate, FateNode, FateTree, IsLeft
 from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import Signal, SignalCount
 from sonin.model.stimulation import SnapBack, Stimulation
@@ -64,20 +64,20 @@ def binary_fate(
         (
             [
                 ([], fate(activation_level=1), []),
-                ([(1, 1, True)], fate(activation_level=2), [True]),
+                ({(1, True): 1}, fate(activation_level=2), [True]),
             ],
-            binary_fate(fate(activation_level=2), fate(activation_level=1), [(1, 1, True)]),
+            binary_fate(fate(activation_level=2), fate(activation_level=1), {(1, True): 1}),
         ),
         (
             [
                 ([], fate(activation_level=1), []),
-                ([(1, 1, True)], fate(activation_level=2), [True]),
-                ([(2, 1, True)], fate(activation_level=3), [False, True]),
+                ({(1, True): 1}, fate(activation_level=2), [True]),
+                ({(2, True): 1}, fate(activation_level=3), [False, True]),
             ],
             binary_fate(
                 fate(activation_level=2),
-                binary_fate(fate(activation_level=3), fate(activation_level=1), [(2, 1, True)]),
-                [(1, 1, True)],
+                binary_fate(fate(activation_level=3), fate(activation_level=1), {(2, True): 1}),
+                {(1, True): 1},
             ),
         ),
     ],
@@ -93,6 +93,7 @@ def test_add(adds: list[tuple[IsLeft, Fate, list[bool]]], expected: Fate | Binar
     assert tree.root.size() == len(adds)
     assert tree.root == expected
 
+
 @mark.parametrize(
     "root, is_next_left, expected",
     [
@@ -100,34 +101,34 @@ def test_add(adds: list[tuple[IsLeft, Fate, list[bool]]], expected: Fate | Binar
         (None, [False], None),
         (fate(activation_level=1), [True], None),
         (fate(activation_level=1), [False], None),
-        (binary_fate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]), [True], fate(activation_level=2)),
-        (binary_fate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]), [False], fate(activation_level=1)),
+        (binary_fate(fate(activation_level=1), fate(activation_level=2), {(1, True): 1}), [True], fate(activation_level=2)),
+        (binary_fate(fate(activation_level=1), fate(activation_level=2), {(1, True): 1}), [False], fate(activation_level=1)),
         (
             binary_fate(
                 fate(activation_level=1),
-                binary_fate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
-                [(1, 1, True)],
+                binary_fate(fate(activation_level=2), fate(activation_level=3), {(1, True): 1}),
+                {(1, True): 1},
             ),
             [True],
-            binary_fate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
+            binary_fate(fate(activation_level=2), fate(activation_level=3), {(1, True): 1}),
         ),
         (
             binary_fate(
                 fate(activation_level=1),
-                binary_fate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
-                [(1, 1, True)],
+                binary_fate(fate(activation_level=2), fate(activation_level=3), {(1, True): 1}),
+                {(1, True): 1},
             ),
             [False, True],
-            binary_fate(fate(activation_level=1), fate(activation_level=3), [(1, 1, True)]),
+            binary_fate(fate(activation_level=1), fate(activation_level=3), {(1, True): 1}),
         ),
         (
             binary_fate(
                 fate(activation_level=1),
-                binary_fate(fate(activation_level=2), fate(activation_level=3), [(1, 1, True)]),
-                [(1, 1, True)],
+                binary_fate(fate(activation_level=2), fate(activation_level=3), {(1, True): 1}),
+                {(1, True): 1},
             ),
             [False, False],
-            binary_fate(fate(activation_level=1), fate(activation_level=2), [(1, 1, True)]),
+            binary_fate(fate(activation_level=1), fate(activation_level=2), {(1, True): 1}),
         ),
     ],
 )
@@ -139,25 +140,26 @@ def test_remove(root: FateNode, is_next_left: list[bool], expected: Fate | Binar
 
     assert tree.root == expected
 
+
 @mark.parametrize(
     "is_left, signals, expected_activation_level",
     [
-        ([(1, 0, True)], {}, 1),
-        ([(1, 0, False)], {}, 1),
-        ([(1, 1, True)], {}, 1),
-        ([(1, 1, False)], {}, 2),
-        ([(1, 0, True)], {1: 0}, 1),
-        ([(1, 0, False)], {1: 0}, 1),
-        ([(1, 1, True)], {1: 0}, 1),
-        ([(1, 1, False)], {1: 0}, 2),
-        ([(1, 2, True), (2, 3, False)], {1: 1, 2: 4}, 1),
-        ([(1, 2, True), (2, 3, False)], {1: 1, 2: 4, 3: 7}, 1),
-        ([(1, 2, False), (2, 3, False)], {1: 1, 2: 4}, 2),
-        ([(1, 2, True), (2, 3, True)], {1: 1, 2: 4}, 2),
+        ({(1, True): 0}, {}, 1),
+        ({(1, False): 0}, {}, 1),
+        ({(1, True): 1}, {}, 1),
+        ({(1, False): 1}, {}, 2),
+        ({(1, True): 0}, {1: 0}, 1),
+        ({(1, False): 0}, {1: 0}, 1),
+        ({(1, True): 1}, {1: 0}, 1),
+        ({(1, False): 1}, {1: 0}, 2),
+        ({(1, True): 2, (2, False): 3}, {1: 1, 2: 4}, 1),
+        ({(1, True): 2, (2, False): 3}, {1: 1, 2: 4, 3: 7}, 1),
+        ({(1, False): 2, (2, False): 3}, {1: 1, 2: 4}, 2),
+        ({(1, True): 2, (2, True): 3}, {1: 1, 2: 4}, 2),
     ],
 )
 def test_binary_fate(
-    is_left: list[tuple[Signal, Threshold, bool]],
+    is_left: IsLeft,
     signals: dict[Signal, SignalCount],
     expected_activation_level: int,
 ):

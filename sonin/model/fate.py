@@ -14,7 +14,7 @@ type IsLower = bool
 
 # Represents a collection of predicates:
 #     "does the count of this `Signal` meet the `Threshold` in the direction indicated by `IsLower`?"
-type IsLeft = list[tuple[Signal, Threshold, IsLower]]
+type IsLeft = dict[tuple[Signal, IsLower], Threshold]
 
 
 class FateNode(BaseModel):
@@ -63,7 +63,7 @@ class BinaryFate(FateNode):
     def get_fate(self, signals: dict[Signal, SignalCount]) -> Fate:
         if all(
             signals.get(signal, 0) <= threshold if is_lower else signals.get(signal, 0) >= threshold
-            for signal, threshold, is_lower in self.is_left
+            for (signal, is_lower), threshold in self.is_left.items()
         ):
             return self.left.get_fate(signals)
         else:
