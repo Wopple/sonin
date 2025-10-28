@@ -150,21 +150,21 @@ class SignalValueMutagen(Mutagen):
 
         for _ in range(num_mutations):
             mutator.mutate(1)
-            delta = rand_int(1, self.deviation_weight)
 
             if not self.signal_counts or add_new.value:
                 # add a random new signal preferring small numbers
                 add_new.bool_value = False
-                self.signal_counts[self.new_key()] = delta
+                self.signal_counts[self.new_key()] = rand_int(1, self.deviation_weight)
             elif add_old.value:
                 # add to a random existing signal
                 add_old.bool_value = False
                 signal = choice(self.signal_counts.keys())
-                self.signal_counts[signal] += delta
+                self.signal_counts[signal] += rand_int(1, self.deviation_weight)
             elif sub.value:
                 # subtract from a random existing signal
                 sub.bool_value = False
                 signal = choice(self.signal_counts.keys())
+                delta = rand_int(1, self.deviation_weight)
 
                 if delta < self.signal_counts[signal]:
                     self.signal_counts[signal] -= delta
@@ -367,3 +367,94 @@ class FateMutagen(Mutagen):
 
     def mutate(self, num_mutations: int):
         self.mutator.mutate(num_mutations)
+
+
+class IsLeftMutagen(Mutagen):
+    is_left: IsLeft = Field(default_factory=dict)
+    new_weight: int = 1
+    remove_weight: int = None
+    update_weight: int = 5
+    change_signal_weight: int = 1
+    is_lower_weight: int = 1
+    add_weight: int = 1
+    sub_weight: int = 1
+
+    def model_post_init(self, context: Any, /):
+        if self.remove_weight is None:
+            # prefer fewer constraints in the long run
+            self.remove_weight = self.new_weight + 1
+
+    @property
+    def value(self) -> IsLeft:
+        return self.is_left.copy()
+
+    def mutate(self, num_mutations: int):
+        # these mutagens pick which action to perform per mutation
+        new = BoolMutagen(bool_value=False, occurrence_weight=self.new_weight)
+        remove = BoolMutagen(bool_value=False, occurrence_weight=self.remove_weight)
+        update = BoolMutagen(bool_value=False, occurrence_weight=self.update_weight)
+        change_signal = BoolMutagen(bool_value=False, occurrence_weight=self.change_signal_weight)
+        is_lower = BoolMutagen(bool_value=False, occurrence_weight=self.is_lower_weight)
+        add = BoolMutagen(bool_value=False, occurrence_weight=self.add_weight)
+        sub = BoolMutagen(bool_value=False, occurrence_weight=self.sub_weight)
+        mutator = Mutator(mutagens=[new, remove, update])
+        update_mutator = Mutator(mutagens=[change_signal, is_lower, add, sub])
+
+        for _ in range(num_mutations):
+            mutator.mutate(1)
+
+            if not self.is_left or new.value:
+                # add a random new key preferring small numbers
+                new.bool_value = False
+                self.is_left[self.new_key()] = rand_int(1, self.deviation_weight)
+            elif remove.value:
+                # remove a random existing key
+                remove.bool_value = False
+                del self.is_left[choice(self.is_left.keys())]
+            elif update.value:
+                # update a random existing key
+                update.bool_value = False
+                update_mutator.mutate(1)
+                update_key = choice(self.is_left.keys())
+
+                if change_signal.value:
+                    # change the value the key's signal preferring small numbers
+                    change_signal.bool_value = False
+
+                    self.is_left[self.new_key([update_key[1]])] = self.is_left[update_key]
+                    del self.is_left[update_key]
+                elif is_lower.value:
+                    # invert the key's IsLower, also invert the new key's IsLower if it already exists
+                    is_lower.bool_value = False
+                    new_key = update_key[0], not update_key[1]
+
+                    if new_key in self.is_left:
+                        # swap
+                        temp = self.is_left[new_key]
+                        self.is_left[new_key] = self.is_left[update_key]
+                        self.is_left[update_key] = temp
+                    else:
+                        # move
+                        self.is_left[new_key] = self.is_left[update_key]
+                        del self.is_left[update_key]
+                elif add.value:
+                    # increase key's threshold
+                    add.bool_value = False
+                    self.is_left[update_key] += rand_int(1, self.deviation_weight)
+                elif add.value:
+                    # decrease key's threshold
+                    add.bool_value = False
+                    new_threshold = self.is_left[update_key] - rand_int(1, self.deviation_weight)
+                    self.is_left[update_key] = max(new_threshold, 0)
+
+    def new_key(self, is_lowers: list[IsLower] | None = None) -> tuple[Signal, IsLower]:
+        is_lowers = is_lowers or [False, True]
+
+        for new_signal in count():
+            for new_is_lower in is_lowers:
+                key = new_signal, new_is_lower
+
+                if key not in self.is_left and rand_bool():
+                    return key
+
+        raise RuntimeError("unreachable")
