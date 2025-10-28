@@ -44,8 +44,8 @@ class SignalProfile(BaseModel):
 
         direction = that_position - this_position
 
-        # dividing by distance to weaken farther signals
-        # dividing by the square because the first division merely counteracts the amplifying effect of distance when
-        # calculating the direction vector
-        # multiplying by a factor to avoid loss of precision due to integer division
+        # Dividing by distance to weaken farther signals.
+        # Dividing by the square because the first division merely counteracts the amplifying effect of distance when
+        # calculating the direction vector.
+        # Multiplying by a factor to avoid loss of precision due to integer division and to support multiple signals.
         return (direction * (factor * degree_of_attraction)) // (distance * distance)

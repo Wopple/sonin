@@ -44,6 +44,7 @@ class Fate(FateNode):
 
 class BinaryFate(FateNode):
     """ A branch in a decision tree """
+
     left: FateNode
     right: FateNode
     is_left: IsLeft

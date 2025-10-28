@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 from pytest import mark
 
-from sonin.model.fate import BinaryFate, Fate, FateNode, FateTree, IsLeft
+from sonin.model.fate import BinaryFate, Fate, FateNode, FateTree, IsLeft, Threshold
 from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import Signal, SignalCount
 from sonin.model.stimulation import SnapBack, Stimulation
@@ -138,3 +138,33 @@ def test_remove(root: FateNode, is_next_left: list[bool], expected: Fate | Binar
     tree.remove(mock_is_next_left)
 
     assert tree.root == expected
+
+@mark.parametrize(
+    "is_left, signals, expected_activation_level",
+    [
+        ([(1, 0, True)], {}, 1),
+        ([(1, 0, False)], {}, 1),
+        ([(1, 1, True)], {}, 1),
+        ([(1, 1, False)], {}, 2),
+        ([(1, 0, True)], {1: 0}, 1),
+        ([(1, 0, False)], {1: 0}, 1),
+        ([(1, 1, True)], {1: 0}, 1),
+        ([(1, 1, False)], {1: 0}, 2),
+        ([(1, 2, True), (2, 3, False)], {1: 1, 2: 4}, 1),
+        ([(1, 2, True), (2, 3, False)], {1: 1, 2: 4, 3: 7}, 1),
+        ([(1, 2, False), (2, 3, False)], {1: 1, 2: 4}, 2),
+        ([(1, 2, True), (2, 3, True)], {1: 1, 2: 4}, 2),
+    ],
+)
+def test_binary_fate(
+    is_left: list[tuple[Signal, Threshold, bool]],
+    signals: dict[Signal, SignalCount],
+    expected_activation_level: int,
+):
+    actual = binary_fate(
+        left=fate(activation_level=1),
+        right=fate(activation_level=2),
+        is_left=is_left,
+    ).get_fate(signals)
+
+    assert actual.activation_level == expected_activation_level

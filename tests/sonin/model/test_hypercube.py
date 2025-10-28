@@ -241,3 +241,49 @@ def test_initialize():
         (2, 2, 1),
         (2, 2, 2),
     ]
+
+
+@mark.parametrize(
+    'dna, expected_center',
+    [
+        (Dna(min_neurons=1, n_dimension=1), [(0,)]),
+        (Dna(min_neurons=2, n_dimension=1), [(0,), (1,)]),
+        (Dna(min_neurons=3, n_dimension=1), [(1,)]),
+        (Dna(min_neurons=4, n_dimension=1), [(1,), (2,)]),
+        (Dna(min_neurons=1, n_dimension=2), [(0, 0)]),
+        (Dna(min_neurons=4, n_dimension=2), [(0, 0), (0, 1), (1, 0), (1, 1)]),
+        (Dna(min_neurons=9, n_dimension=2), [(1, 1)]),
+        (Dna(min_neurons=16, n_dimension=2), [(1, 1), (1, 2), (2, 1), (2, 2)]),
+        (Dna(min_neurons=1, n_dimension=3), [(0, 0, 0)]),
+        (Dna(min_neurons=8, n_dimension=3), [
+            (0, 0, 0),
+            (0, 0, 1),
+            (0, 1, 0),
+            (0, 1, 1),
+            (1, 0, 0),
+            (1, 0, 1),
+            (1, 1, 0),
+            (1, 1, 1),
+        ]),
+        (Dna(min_neurons=27, n_dimension=3), [(1, 1, 1)]),
+        (Dna(min_neurons=64, n_dimension=3), [
+            (1, 1, 1),
+            (1, 1, 2),
+            (1, 2, 1),
+            (1, 2, 2),
+            (2, 1, 1),
+            (2, 1, 2),
+            (2, 2, 1),
+            (2, 2, 2),
+        ]),
+    ]
+)
+def test_center(dna: Dna, expected_center: list[tuple[int, ...]]):
+    hypercube = Hypercube(
+        n_dimension=dna.n_dimension,
+        dimension_size=dna.dimension_size,
+    )
+
+    hypercube.initialize(lambda position: position.value)
+
+    assert hypercube.center() == expected_center

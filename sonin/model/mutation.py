@@ -1,6 +1,6 @@
 from itertools import count
 from random import choice, randint, shuffle
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,18 +17,18 @@ class Mutable:
         raise NotImplementedError(f"{self.__class__.__name__}.mutate")
 
 
-class Mutagen[T](BaseModel, Mutable):
+class Mutagen(BaseModel, Mutable):
     occurrence_weight: int = Field(default=1, ge=1)
     deviation_weight: int = Field(default=1, ge=1)
 
     @property
-    def value(self) -> T:
+    def value(self) -> Any:
         raise NotImplementedError(f"{self.__class__.__name__}.value")
 
 
 class Mutator(BaseModel, Mutable):
-    mutagens: list[Mutagen[Any]]
-    mutagen_map: dict[int, Mutagen[Any]] = None
+    mutagens: list[Mutagen]
+    mutagen_map: dict[int, Mutagen] = None
     mutation_selector: list[int] = None
 
     def model_post_init(self, context: Any, /):
@@ -56,7 +56,7 @@ class Mutator(BaseModel, Mutable):
             self.mutagen_map[i].mutate(num)
 
 
-class BoolMutagen(Mutagen[bool]):
+class BoolMutagen(Mutagen):
     bool_value: bool
 
     @property
@@ -67,7 +67,7 @@ class BoolMutagen(Mutagen[bool]):
         self.bool_value = not self.bool_value
 
 
-class IntMutagen(Mutagen[int]):
+class IntMutagen(Mutagen):
     int_value: int
     min_value: int | None = None
     max_value: int | None = None
@@ -101,8 +101,8 @@ class UintMutagen(IntMutagen):
     MAX: ClassVar[int] = 2 ** 64 - 1
 
 
-class OptionalMutagen[T](Mutagen[Any | None]):
-    mutagen: Mutagen[T]
+class OptionalMutagen[T](Mutagen):
+    mutagen: Mutagen
     exists: BoolMutagen
     mutator: Mutator = None
 
@@ -119,10 +119,15 @@ class OptionalMutagen[T](Mutagen[Any | None]):
             return None
 
     def mutate(self, num_mutations: int):
-        self.mutator.mutate(num_mutations)
+        if self.exists.value:
+            # if it exists, randomly choose the mutagen to mutate
+            self.mutator.mutate(num_mutations)
+        else:
+            # if it does not exist, bring it into existence
+            self.exists.mutate(1)
 
 
-class SignalValueMutagen(Mutagen[dict[Signal, int]]):
+class SignalValueMutagen(Mutagen):
     signal_counts: dict[Signal, int] = Field(default_factory=dict)
     add_old_weight: int = 3
     add_new_weight: int = 1
@@ -172,7 +177,7 @@ class SignalValueMutagen(Mutagen[dict[Signal, int]]):
                     del self.signal_counts[signal]
 
 
-class SignalProfileMutagen(Mutagen[SignalProfile]):
+class SignalProfileMutagen(Mutagen):
     affinities: dict[Signal, SignalValueMutagen] = Field(default_factory=dict)
 
     # affinity weights
@@ -234,7 +239,7 @@ class SignalProfileMutagen(Mutagen[SignalProfile]):
                 del self.affinities[signal]
 
 
-class FacilitationMutagen(Mutagen[Facilitation]):
+class FacilitationMutagen(Mutagen):
     granularity: UintMutagen
     limit: UintMutagen
     mutator: Mutator = None
@@ -255,7 +260,7 @@ class FacilitationMutagen(Mutagen[Facilitation]):
         self.mutator.mutate(num_mutations)
 
 
-class TetanicPeriodMutagen(Mutagen[TetanicPeriod]):
+class TetanicPeriodMutagen(Mutagen):
     threshold: UintMutagen
     activations: UintMutagen
     gap: UintMutagen
@@ -278,7 +283,7 @@ class TetanicPeriodMutagen(Mutagen[TetanicPeriod]):
         self.mutator.mutate(num_mutations)
 
 
-class SnapBackMutagen(Mutagen[SnapBack]):
+class SnapBackMutagen(Mutagen):
     baseline: IntMutagen
     restore_rate: UintMutagen
     restore_damper: UintMutagen
@@ -301,7 +306,7 @@ class SnapBackMutagen(Mutagen[SnapBack]):
         self.mutator.mutate(num_mutations)
 
 
-class StimulationMutagen(Mutagen[Stimulation]):
+class StimulationMutagen(Mutagen):
     amount: UintMutagen
     snap_back: SnapBackMutagen
     mutator: Mutator = None

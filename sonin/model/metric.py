@@ -3,6 +3,11 @@ from sonin.sonin_math import div
 
 
 class FrequencyProfile:
+    """
+    Records a sliding window of the elapsed time since the last record based on the c_time of the events. Calculates
+    metrics related to the frequency of events.
+    """
+
     def __init__(self, size: int):
         assert size >= 1
 
@@ -16,10 +21,12 @@ class FrequencyProfile:
             self.last_time = c_time
             return
 
-        if len(self.deltas) == self.size:
+        if self.is_full():
+            # the buffer has filled, treat like a ring buffer
             self.deltas[self.i_next] = c_time - self.last_time
             self.i_next = (self.i_next + 1) % self.size
         else:
+            # continue to add to the buffer
             self.deltas.append(c_time - self.last_time)
 
         self.last_time = c_time

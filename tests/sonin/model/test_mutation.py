@@ -2,7 +2,34 @@ from random import seed
 
 from pytest import mark
 
-from sonin.model.mutation import IntMutagen, UintMutagen
+from sonin.model.mutation import BoolMutagen, IntMutagen, OptionalMutagen, UintMutagen
+
+
+@mark.parametrize(
+    'value, deviation_weight',
+    [
+        (True, 1),
+        (True, 2),
+        (True, 10),
+        (True, 100),
+        (False, 1),
+        (False, 2),
+        (False, 10),
+        (False, 100),
+    ],
+)
+def test_bool_mutagen(
+    value: bool,
+    deviation_weight: int,
+):
+    mutagen = BoolMutagen(
+        bool_value=value,
+        deviation_weight=deviation_weight,
+    )
+
+    mutagen.mutate(1)
+
+    assert mutagen.value is not value
 
 
 @mark.parametrize(
@@ -120,3 +147,42 @@ def test_uint_mutagen(
     mutagen.mutate(1)
 
     assert mutagen.value == expected
+
+
+@mark.parametrize(
+    'seed_value, value, exists, expected',
+    [
+        # seed 0 chooses the value mutagen
+        (0, True, True, False),
+        (0, False, True, True),
+
+        # seed 1 chooses the exist mutagen
+        (1, True, True, None),
+        (1, False, True, None),
+
+        # always bring the value into existence unchanged
+        (0, True, False, True),
+        (0, False, False, False),
+        (1, True, False, True),
+        (1, False, False, False),
+    ],
+)
+def test_optional_mutagen(
+    seed_value: int,
+    value: bool,
+    exists: bool,
+    expected: bool | None,
+):
+    seed(seed_value)
+
+    value_mutagen = BoolMutagen(bool_value=value)
+    exists_mutagen = BoolMutagen(bool_value=exists)
+
+    optional_mutagen = OptionalMutagen[bool](
+        mutagen=value_mutagen,
+        exists=exists_mutagen,
+    )
+
+    optional_mutagen.mutate(1)
+
+    assert optional_mutagen.value is expected

@@ -306,7 +306,7 @@ def plot_synapses():
     ax.grid(True)
     ax.set_xlabel('x')
     ax.set_ylabel('y')
-    ax.set_title('2D Line Segments')
+    ax.set_title('Synapses')
     plt.show()
 
 

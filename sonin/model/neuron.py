@@ -118,11 +118,13 @@ class Neuron(BaseModel):
         self.stimulation.step()
         self.tetanic_period and self.tetanic_period.step(c_time)
 
+        # activate if potential is exceeded or there is a tetanic activation
         if self.state == ACCEPTING:
             is_tetanic = self.tetanic_period and self.tetanic_period.is_active(c_time)
 
             if self.potential >= self.activation_level or is_tetanic:
                 self.activate(c_time)
+        # re-enable after the refactory period ends
         elif self.state == REFACTORY and c_time >= self.t_refactory_end:
             self.enable()
 
