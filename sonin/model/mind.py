@@ -114,20 +114,25 @@ class Mind(BaseModel):
                 )
 
                 # Sum the attractive effects between the signals
-                for guide_signal, guide_signal_count, location, effective_range in all_signals:
-                    distance = location.city_distance(axon_position)
+                for guide_signal, guide_signal_count, guide_position, effective_range in all_signals:
+                    distance = guide_position.city_distance(axon_position)
 
-                    # do not apply signals out of range
-                    if distance <= effective_range:
-                        for growth_signal, growth_signal_count in growth_signals.items():
-                            degree_of_attraction = self.signal_profile.attraction(growth_signal, guide_signal)
+                    # skip signals that are out of range
+                    if distance > effective_range:
+                        continue
 
-                            # TODO: use the method from SignalProfile
-                            # dividing by distance to weaken farther signals
-                            attraction += div(
-                                (location - axon_position) * degree_of_attraction * growth_signal_count,
-                                distance,
-                            )
+                    # skip signals that are behind the axon
+                    if direction * (guide_position - axon_position) < 0:
+                        continue
+
+                    for growth_signal, growth_signal_count in growth_signals.items():
+                        attraction += self.signal_profile.attraction_force(
+                            growth_signal,
+                            guide_signal,
+                            axon_position,
+                            guide_position,
+                            growth_signal_count * guide_signal_count,
+                        )
 
                 # Stop if the net attraction is zero
                 if all(c == 0 for c in attraction.value):
