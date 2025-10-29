@@ -141,14 +141,14 @@ class OptionalMutagen[T](Mutagen):
 
 class SignalValueMutagen(Mutagen):
     signal_counts: dict[Signal, int] = Field(default_factory=dict)
-    add_old_weight: int = 3
-    add_new_weight: int = 1
+    new_weight: int = 1
+    add_weight: int = 3
     sub_weight: int = None
 
     def model_post_init(self, context: Any, /):
         if self.sub_weight is None:
             # plus 1 to prefer small numbers in the long run
-            self.sub_weight = self.add_old_weight + self.add_new_weight + 1
+            self.sub_weight = self.add_weight + self.new_weight + 1
 
     @property
     def value(self) -> dict[Signal, int]:
@@ -156,21 +156,21 @@ class SignalValueMutagen(Mutagen):
 
     def mutate(self, num_mutations: int):
         # these mutagens pick which action to perform per mutation
-        add_old = BoolMutagen(bool_value=False, occurrence_weight=self.add_old_weight)
-        add_new = BoolMutagen(bool_value=False, occurrence_weight=self.add_new_weight)
+        new = BoolMutagen(bool_value=False, occurrence_weight=self.new_weight)
+        add = BoolMutagen(bool_value=False, occurrence_weight=self.add_weight)
         sub = BoolMutagen(bool_value=False, occurrence_weight=self.sub_weight)
-        mutator = Mutator(mutagens=[add_old, add_new, sub])
+        mutator = Mutator(mutagens=[new, add, sub])
 
         for _ in range(num_mutations):
             mutator.mutate(1)
 
-            if not self.signal_counts or add_new.value:
+            if not self.signal_counts or new.value:
                 # add a random new signal preferring small numbers
-                add_new.bool_value = False
+                new.bool_value = False
                 self.signal_counts[self.new_key()] = rand_int(1, self.deviation_weight)
-            elif add_old.value:
+            elif add.value:
                 # add to a random existing signal
-                add_old.bool_value = False
+                add.bool_value = False
                 signal = choice(self.signal_counts.keys())
                 self.signal_counts[signal] += rand_int(1, self.deviation_weight)
             elif sub.value:
@@ -201,9 +201,9 @@ class SignalProfileMutagen(Mutagen):
     remove_weight: int = None
 
     # value weights
-    add_old_weight: int | None = None
-    add_new_weight: int | None = None
-    sub_weight: int | None = None
+    signal_new_weight: int | None = None
+    signal_add_weight: int | None = None
+    signal_sub_weight: int | None = None
 
     def model_post_init(self, context: Any, /):
         if self.remove_weight is None:
@@ -229,9 +229,9 @@ class SignalProfileMutagen(Mutagen):
                 add.bool_value = False
 
                 mutagen = SignalValueMutagen(
-                    add_old_weight=self.add_old_weight,
-                    add_new_weight=self.add_new_weight,
-                    sub_weight=self.sub_weight,
+                    new_weight=self.signal_new_weight,
+                    add_weight=self.signal_add_weight,
+                    sub_weight=self.signal_sub_weight,
                 )
 
                 mutagen.mutate(1)
@@ -259,8 +259,8 @@ class SignalProfileMutagen(Mutagen):
 
 
 class FacilitationMutagen(Mutagen):
-    granularity: UintMutagen
-    limit: UintMutagen
+    granularity: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
+    limit: UintMutagen = Field(default_factory=UintMutagen)
 
     @property
     def value(self) -> Facilitation:
@@ -278,12 +278,7 @@ class FacilitationMutagen(Mutagen):
 
 class TetanicPeriodMutagen(Mutagen):
     threshold: UintMutagen = Field(default_factory=UintMutagen)
-
-    activations: UintMutagen = Field(default_factory=lambda: UintMutagen(
-        int_value=1,
-        min_value=1,
-    ))
-
+    activations: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
     gap: UintMutagen = Field(default_factory=UintMutagen)
 
     @property
@@ -327,11 +322,7 @@ class SnapBackMutagen(Mutagen):
 
 
 class StimulationMutagen(Mutagen):
-    amount: UintMutagen = Field(default_factory=lambda: UintMutagen(
-        int_value=1,
-        min_value=1,
-    ))
-
+    amount: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
     snap_back: SnapBackMutagen = Field(default_factory=SnapBackMutagen)
 
     @property
@@ -389,17 +380,14 @@ class EnvironmentMutagen(Mutagen):
             if not self.environment or new.value:
                 # add a new random signal preferring small numbers
                 new.bool_value = False
-
                 self.environment[self.new_key()] = rand_int(1, self.deviation_weight)
             elif remove.value:
                 # add a random signal
                 remove.bool_value = False
-
                 del self.environment[choice(self.environment.keys())]
             elif update.value:
                 # update a random signal
                 update.bool_value = False
-
                 update_mutator.mutate(1)
                 update_key = choice(self.environment.keys())
 
@@ -472,12 +460,7 @@ class EnvironmentMutagen(Mutagen):
 class FateMutagen(Mutagen):
     excites: BoolMutagen = Field(default_factory=BoolMutagen)
     axon_signals: SignalValueMutagen = Field(default_factory=SignalValueMutagen)
-
-    activation_level: UintMutagen = Field(default_factory=lambda: UintMutagen(
-        int_value=1,
-        min_value=1,
-    ))
-
+    activation_level: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
     refactory_period: UintMutagen = Field(default_factory=UintMutagen)
     stimulation: StimulationMutagen = Field(default_factory=StimulationMutagen)
 
@@ -623,11 +606,15 @@ class FateTreeMutagen(Mutagen, BinaryTree):
     new_weight: int = 1
     remove_weight: int = 1
     update_weight: int = 14
-    is_next_left: Callable[[], bool] = rand_bool
+    is_next_left: Callable[[], bool] = Field(default=rand_bool, exclude=True)
 
     # BinaryTree
     root: FateMutagen | BinaryFateMutagen | None = None
-    is_leaf: Callable[[FateMutagen | BinaryFateMutagen], bool] = lambda n: isinstance(n, FateMutagen)
+
+    is_leaf: Callable[[FateMutagen | BinaryFateMutagen], bool] = Field(
+        default=lambda n: isinstance(n, FateMutagen),
+        exclude=True,
+    )
 
     @property
     def value(self) -> FateTree:
