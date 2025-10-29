@@ -22,7 +22,7 @@ class Dna:
         self._n_synapse: UintMutagen = UintMutagen(int_value=n_synapse, min_value=1)
 
         # Number of virtual spacial dimensions in a mind
-        self._n_dimension: UintMutagen = UintMutagen(int_value=n_dimension, min_value=1, max_value=5)
+        self.n_dimension: int = n_dimension
 
         # Level at which a neuron activates
         self._activation_level: UintMutagen = UintMutagen(int_value=activation_level, min_value=1)
@@ -44,28 +44,25 @@ class Dna:
         self.mutator: Mutator = Mutator(mutagens=[
             self._min_neurons,
             self._n_synapse,
-            self._n_dimension,
             self._activation_level,
             self._max_neuron_strength,
             self._refactory_period,
             self._facilitation,
         ])
 
-        self.initialize()
-
-    def initialize(self):
-        # Size of the hypercube of neurons, rounded up from the minimum number of neurons such that
-        # dimension_size ^ n_dimension >= min_neurons
+    @property
+    def dimension_size(self) -> int:
+        """
+        Size of the hypercube of neurons, rounded up from the minimum number of neurons such that:
+        dimension_size ^ n_dimension >= min_neurons
+        """
 
         dimension_size: int = 1
 
         while dimension_size ** self.n_dimension < self.min_neurons:
             dimension_size += 1
 
-        self.dimension_size: int = dimension_size
-
-        # Total number of neurons
-        self.n_neuron: int = self.dimension_size ** self.n_dimension
+        return dimension_size
 
     @property
     def min_neurons(self) -> int:
@@ -74,10 +71,6 @@ class Dna:
     @property
     def n_synapse(self) -> int:
         return self._n_synapse.value
-
-    @property
-    def n_dimension(self) -> int:
-        return self._n_dimension.value
 
     @property
     def activation_level(self) -> int:
@@ -101,4 +94,3 @@ class Dna:
 
     def mutate(self, num_mutations: int):
         self.mutator.mutate(num_mutations)
-        self.initialize()

@@ -6,10 +6,25 @@ from pydantic import BaseModel, Field
 from sonin.model.facilitation import Facilitation
 from sonin.model.fate import BinaryFate, Fate, FateTree, IsLeft, IsLower
 from sonin.model.neuron import TetanicPeriod
-from sonin.model.signal import Signal, SignalProfile
+from sonin.model.signal import Signal, SignalCount, SignalProfile
 from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.sonin_random import choice, rand_bool, rand_int, rand_sign, shuffle
 from sonin.tree import BinaryTree
+
+# list[tuple[Numerator, DenominatorDelta]]
+#
+# Each item encodes the relative position within the dimension associated with its position in the list. The list must
+# be of size n_dimension. Each position component is calculated as:
+#
+# dimension_size * Numerator // (Numerator + DenominatorDelta)
+#
+# (1, 1) means: 1 // (1 + 1) or 50%
+# (3, 1) means: 3 // (3 + 1) or 75%
+# (2, 3) means: 2 // (2 + 3) or 40%
+# [(3, 1), (2, 3)] means: 75% along dimension 0 and 40% along dimension 1
+#
+# This allows position encodings to remain consistent across changes in dimension size.
+type Position = list[tuple[int, int]]
 
 
 class Mutable:
@@ -331,6 +346,127 @@ class StimulationMutagen(Mutagen):
             self.amount,
             self.snap_back,
         ]).mutate(num_mutations)
+
+
+class EnvironmentMutagen(Mutagen):
+    environment: dict[tuple[Signal, Position], SignalCount] = Field(default_factory=dict)
+    n_dimension: int
+    new_weight: int = 1
+    remove_weight: int = 1
+    update_weight: int = 14
+    change_signal_weight: int = 1
+    position_weight: int = 3
+    add_count_weight: int = 6
+    sub_count_weight: int = 6
+
+    @property
+    def value(self) -> dict[tuple[Signal, Position], SignalCount]:
+        return {
+            (
+                signal,
+                [
+                    (numerator, numerator + delta)
+                    for numerator, delta in position
+                ],
+            ): signal_count
+            for (signal, position), signal_count in self.environment.items()
+        }
+
+    def mutate(self, num_mutations: int):
+        new = BoolMutagen(bool_value=False, occurrence_weight=self.new_weight)
+        remove = BoolMutagen(bool_value=False, occurrence_weight=self.remove_weight)
+        update = BoolMutagen(bool_value=False, occurrence_weight=self.update_weight)
+        change_signal = BoolMutagen(bool_value=False, occurrence_weight=self.change_signal_weight)
+        position = BoolMutagen(bool_value=False, occurrence_weight=self.position_weight)
+        add_count = BoolMutagen(bool_value=False, occurrence_weight=self.add_count_weight)
+        sub_count = BoolMutagen(bool_value=False, occurrence_weight=self.sub_count_weight)
+        mutator = Mutator(mutagens=[new, remove, update])
+        update_mutator = Mutator(mutagens=[change_signal, position, add_count, sub_count])
+
+        for _ in range(num_mutations):
+            mutator.mutate(1)
+
+            if not self.environment or new.value:
+                # add a new random signal preferring small numbers
+                new.bool_value = False
+
+                self.environment[self.new_key()] = rand_int(1, self.deviation_weight)
+            elif remove.value:
+                # add a random signal
+                remove.bool_value = False
+
+                del self.environment[choice(self.environment.keys())]
+            elif update.value:
+                # update a random signal
+                update.bool_value = False
+
+                update_mutator.mutate(1)
+                update_key = choice(self.environment.keys())
+
+                if change_signal.value:
+                    change_signal.bool_value = False
+                    self.update_change_signal(update_key)
+                elif position.value:
+                    position.bool_value = False
+                    self.update_position(update_key)
+                elif add_count.value:
+                    add_count.bool_value = False
+                    self.update_add_count(update_key)
+                elif sub_count.value:
+                    sub_count.bool_value = False
+                    self.update_sub_count(update_key)
+
+    def update_change_signal(self, update_key: tuple[Signal, Position]):
+        # change to a new signal
+        signal_mutagen = UintMutagen(int_value=update_key[0])
+        signal_mutagen.mutate(1)
+
+        if signal_mutagen.value != update_key[0]:
+            self[signal_mutagen.value, update_key[1]] = self[update_key]
+            del self.environment[update_key]
+
+    def update_position(self, update_key: tuple[Signal, Position]):
+        # change the position
+        dim = choice(range(self.n_dimension))
+        position = update_key[1]
+        dim_position = position[dim]
+
+        if rand_bool():
+            # mutate the numerator
+            mutator = UintMutagen(int_value=dim_position[0])
+            mutator.mutate(1)
+            position[dim] = (mutator.value, dim_position[1])
+        else:
+            # mutate the denominator delta
+            # min_value=1 because 0, 0 results in a division by zero, (0, 1) instead divides by 1
+            mutator = UintMutagen(int_value=dim_position[1], min_value=1)
+            mutator.mutate(1)
+            position[dim] = (dim_position[0], mutator.value)
+
+    def update_add_count(self, update_key: tuple[Signal, Position]):
+        # increase the signal count
+        position, signal_count = self.environment[update_key]
+        self.environment[update_key] = signal_count + rand_int(1, self.deviation_weight)
+
+    def update_sub_count(self, update_key: tuple[Signal, Position]):
+        # decrease the signal count
+        position, signal_count = self.environment[update_key]
+        delta = rand_int(1, self.deviation_weight)
+
+        if signal_count > delta:
+            self.environment[update_key] = signal_count - delta
+        else:
+            del self.environment[update_key]
+
+    def new_key(self) -> tuple[Signal, Position]:
+        # We cannot prevent the same key from showing up multiple times so that the signal can show up in multiple
+        # places. It is okay if they start in the same spot because they can move independently.
+        for new_signal in count():
+            if rand_bool():
+                # start in the middle
+                return new_signal, [(1, 1) for _ in range(self.n_dimension)]
+
+        raise RuntimeError("unreachable")
 
 
 class FateMutagen(Mutagen):
