@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Vector
 from sonin.model.signal import Signal, SignalCount
-from sonin.model.stimulation import SnapBack, Stimulation
+from sonin.model.stimulation import Stimulation
 from sonin.model.synapse import Synapse
 
 # Will accept potential from pre-synaptic neurons
@@ -17,14 +17,14 @@ REFACTORY = 1
 class TetanicPeriod(BaseModel):
     """ Represents a periodic schedule of tetanic activations """
 
-    # Number of steps to begin tetanic activation
-    threshold: int
+    # Number of dormant steps before tetanic activations
+    threshold: int = Field(ge=0)
 
     # Number of activations in each tetanus
-    activations: int
+    activations: int = Field(ge=1)
 
-    # Number of steps between activations during tetanus
-    gap: int
+    # Number of inactive steps between activations during tetanus
+    gap: int = Field(ge=0)
 
     # True if dormant, False if within tetanus
     dormant: bool = True

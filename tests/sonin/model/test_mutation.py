@@ -1,6 +1,6 @@
 from pytest import mark
 
-from sonin.model.mutation import BoolMutagen, IntMutagen, OptionalMutagen, UintMutagen
+from sonin.model.mutation import BoolMutagen, FateTreeMutagen, IntMutagen, OptionalMutagen, UintMutagen
 from sonin.sonin_random import seed
 
 

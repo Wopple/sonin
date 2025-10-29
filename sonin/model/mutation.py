@@ -1,14 +1,15 @@
 from itertools import count
-from typing import Any, ClassVar, Self
+from typing import Any, Callable, ClassVar, Self
 
 from pydantic import BaseModel, Field
 
 from sonin.model.facilitation import Facilitation
-from sonin.model.fate import BinaryFate, Fate, IsLeft, IsLower
+from sonin.model.fate import BinaryFate, Fate, FateTree, IsLeft, IsLower
 from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import Signal, SignalProfile
 from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.sonin_random import choice, rand_bool, rand_int, rand_sign, shuffle
+from sonin.tree import BinaryTree
 
 
 class Mutable:
@@ -56,7 +57,7 @@ class Mutator(BaseModel, Mutable):
 
 
 class BoolMutagen(Mutagen):
-    bool_value: bool
+    bool_value: bool = False
 
     @property
     def value(self) -> bool:
@@ -67,7 +68,7 @@ class BoolMutagen(Mutagen):
 
 
 class IntMutagen(Mutagen):
-    int_value: int
+    int_value: int = 0
     min_value: int | None = None
     max_value: int | None = None
 
@@ -102,13 +103,7 @@ class UintMutagen(IntMutagen):
 
 class OptionalMutagen[T](Mutagen):
     mutagen: Mutagen
-    exists: BoolMutagen
-    mutator: Mutator = None
-
-    def model_post_init(self, context: Any, /):
-        assert self.mutator is None
-
-        self.mutator = Mutator(mutagens=[self.mutagen, self.exists])
+    exists: BoolMutagen = Field(default_factory=BoolMutagen)
 
     @property
     def value(self) -> T | None:
@@ -120,7 +115,10 @@ class OptionalMutagen[T](Mutagen):
     def mutate(self, num_mutations: int):
         if self.exists.value:
             # if it exists, randomly choose the mutagen to mutate
-            self.mutator.mutate(num_mutations)
+            Mutator(mutagens=[
+                self.mutagen,
+                self.exists,
+            ]).mutate(num_mutations)
         else:
             # if it does not exist, bring it into existence
             self.exists.mutate(1)
@@ -248,12 +246,6 @@ class SignalProfileMutagen(Mutagen):
 class FacilitationMutagen(Mutagen):
     granularity: UintMutagen
     limit: UintMutagen
-    mutator: Mutator = None
-
-    def model_post_init(self, context: Any, /):
-        assert self.mutator is None
-
-        self.mutator = Mutator(mutagens=[self.granularity, self.limit])
 
     @property
     def value(self) -> Facilitation:
@@ -263,19 +255,21 @@ class FacilitationMutagen(Mutagen):
         )
 
     def mutate(self, num_mutations: int):
-        self.mutator.mutate(num_mutations)
+        Mutator(mutagens=[
+            self.granularity,
+            self.limit,
+        ]).mutate(num_mutations)
 
 
 class TetanicPeriodMutagen(Mutagen):
-    threshold: UintMutagen
-    activations: UintMutagen
-    gap: UintMutagen
-    mutator: Mutator = None
+    threshold: UintMutagen = Field(default_factory=UintMutagen)
 
-    def model_post_init(self, context: Any, /):
-        assert self.mutator is None
+    activations: UintMutagen = Field(default_factory=lambda: UintMutagen(
+        int_value=1,
+        min_value=1,
+    ))
 
-        self.mutator = Mutator(mutagens=[self.threshold, self.activations, self.gap])
+    gap: UintMutagen = Field(default_factory=UintMutagen)
 
     @property
     def value(self) -> TetanicPeriod:
@@ -286,41 +280,44 @@ class TetanicPeriodMutagen(Mutagen):
         )
 
     def mutate(self, num_mutations: int):
-        self.mutator.mutate(num_mutations)
+        Mutator(mutagens=[
+            self.threshold,
+            self.activations,
+            self.gap,
+        ]).mutate(num_mutations)
 
 
 class SnapBackMutagen(Mutagen):
-    baseline: IntMutagen
-    restore_rate: UintMutagen
-    restore_damper: UintMutagen
-    mutator: Mutator = None
-
-    def model_post_init(self, context: Any, /):
-        assert self.mutator is None
-
-        self.mutator = Mutator(mutagens=[self.baseline, self.restore_rate, self.restore_damper])
+    baseline: IntMutagen = Field(default_factory=IntMutagen)
+    restore_rate_delta: UintMutagen = Field(default_factory=UintMutagen)
+    restore_damper: UintMutagen = Field(default_factory=UintMutagen)
 
     @property
     def value(self) -> SnapBack:
         return SnapBack(
             baseline=self.baseline.value,
-            restore_rate=self.restore_rate.value,
+
+            # restore_rate >= restore_damper
+            restore_rate=max(self.restore_damper.value + self.restore_rate_delta.value, 1),
+
             restore_damper=self.restore_damper.value,
         )
 
     def mutate(self, num_mutations: int):
-        self.mutator.mutate(num_mutations)
+        Mutator(mutagens=[
+            self.baseline,
+            self.restore_rate_delta,
+            self.restore_damper,
+        ]).mutate(num_mutations)
 
 
 class StimulationMutagen(Mutagen):
-    amount: UintMutagen
-    snap_back: SnapBackMutagen
-    mutator: Mutator = None
+    amount: UintMutagen = Field(default_factory=lambda: UintMutagen(
+        int_value=1,
+        min_value=1,
+    ))
 
-    def model_post_init(self, context: Any, /):
-        assert self.mutator is None
-
-        self.mutator = Mutator(mutagens=[self.amount, self.snap_back])
+    snap_back: SnapBackMutagen = Field(default_factory=SnapBackMutagen)
 
     @property
     def value(self) -> Stimulation:
@@ -330,29 +327,27 @@ class StimulationMutagen(Mutagen):
         )
 
     def mutate(self, num_mutations: int):
-        self.mutator.mutate(num_mutations)
+        Mutator(mutagens=[
+            self.amount,
+            self.snap_back,
+        ]).mutate(num_mutations)
 
 
 class FateMutagen(Mutagen):
-    excites: BoolMutagen
-    axon_signals: SignalValueMutagen
-    activation_level: UintMutagen
-    refactory_period: UintMutagen
-    stimulation: StimulationMutagen
-    tetanic_period: OptionalMutagen[TetanicPeriodMutagen]
-    mutator: Mutator = None
+    excites: BoolMutagen = Field(default_factory=BoolMutagen)
+    axon_signals: SignalValueMutagen = Field(default_factory=SignalValueMutagen)
 
-    def model_post_init(self, context: Any, /):
-        assert self.mutator is None
+    activation_level: UintMutagen = Field(default_factory=lambda: UintMutagen(
+        int_value=1,
+        min_value=1,
+    ))
 
-        self.mutator = Mutator(mutagens=[
-            self.excites,
-            self.axon_signals,
-            self.activation_level,
-            self.refactory_period,
-            self.stimulation,
-            self.tetanic_period,
-        ])
+    refactory_period: UintMutagen = Field(default_factory=UintMutagen)
+    stimulation: StimulationMutagen = Field(default_factory=StimulationMutagen)
+
+    tetanic_period: OptionalMutagen[TetanicPeriodMutagen] = Field(
+        default_factory=lambda: OptionalMutagen[TetanicPeriodMutagen](mutagen=TetanicPeriodMutagen())
+    )
 
     @property
     def value(self) -> Fate:
@@ -366,7 +361,14 @@ class FateMutagen(Mutagen):
         )
 
     def mutate(self, num_mutations: int):
-        self.mutator.mutate(num_mutations)
+        Mutator(mutagens=[
+            self.excites,
+            self.axon_signals,
+            self.activation_level,
+            self.refactory_period,
+            self.stimulation,
+            self.tetanic_period,
+        ]).mutate(num_mutations)
 
 
 class IsLeftMutagen(Mutagen):
@@ -458,3 +460,61 @@ class IsLeftMutagen(Mutagen):
                     return key
 
         raise RuntimeError("unreachable")
+
+
+class BinaryFateMutagen(Mutagen):
+    left: FateMutagen | Self
+    right: FateMutagen | Self
+    is_left: IsLeftMutagen = Field(default_factory=IsLeftMutagen)
+
+    @property
+    def value(self) -> BinaryFate:
+        return BinaryFate(
+            left=self.left.value,
+            right=self.right.value,
+            is_left=self.is_left.value,
+        )
+
+    def mutate(self, num_mutations: int):
+        Mutator(mutagens=[
+            self.left,
+            self.right,
+            self.is_left,
+        ]).mutate(num_mutations)
+
+
+class FateTreeMutagen(Mutagen, BinaryTree):
+    new_weight: int = 1
+    remove_weight: int = 1
+    update_weight: int = 14
+    is_next_left: Callable[[], bool] = rand_bool
+
+    # BinaryTree
+    root: FateMutagen | BinaryFateMutagen | None = None
+    is_leaf: Callable[[FateMutagen | BinaryFateMutagen], bool] = lambda n: isinstance(n, FateMutagen)
+
+    @property
+    def value(self) -> FateTree:
+        return FateTree(root=self.root.value)
+
+    def mutate(self, num_mutations: int):
+        new = BoolMutagen(bool_value=False, occurrence_weight=self.new_weight)
+        remove = BoolMutagen(bool_value=False, occurrence_weight=self.remove_weight)
+        update = BoolMutagen(bool_value=False, occurrence_weight=self.update_weight)
+        mutator = Mutator(mutagens=[new, remove, update])
+
+        for _ in range(num_mutations):
+            mutator.mutate(1)
+
+            if self.root is None or new.value:
+                # add a new random fate to the tree
+                new.bool_value = False
+                self.add(FateMutagen(), lambda l, r: BinaryFateMutagen(left=l, right=r))
+            elif remove.value:
+                # remove a random fate from the tree
+                remove.bool_value = False
+                self.remove()
+            elif update.value:
+                # perform an in-place mutation
+                update.bool_value = False
+                self.root.mutate(1)

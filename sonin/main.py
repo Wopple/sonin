@@ -277,7 +277,7 @@ output_neurons = mind.neurons.items[-6:]
 for i, n in enumerate(input_neurons):
     n.tetanic_period = TetanicPeriod(
         threshold=2 + i,
-        activations=i,
+        activations=1 + i,
         gap=1,
     )
 

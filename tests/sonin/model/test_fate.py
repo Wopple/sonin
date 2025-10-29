@@ -18,7 +18,7 @@ def fate(
     stimulation_restore_rate: int = 2,
     stimulation_restore_damper: int = 1,
     tetanic_threshold: int = 0,
-    tetanic_activations: int = 0,
+    tetanic_activations: int = 1,
     tetanic_gap: int = 0,
 ):
     return Fate(
@@ -88,7 +88,8 @@ def test_add(adds: list[tuple[IsLeft, Fate, list[bool]]], expected: Fate | Binar
     for is_left, leaf, is_next_left in adds:
         mock_is_next_left = Mock()
         mock_is_next_left.side_effect = is_next_left
-        tree.add(is_left, leaf, mock_is_next_left)
+        new_branch = lambda l, r: BinaryFate(left=l, right=r, is_left=is_left)
+        tree.add(leaf, new_branch, mock_is_next_left)
 
     assert tree.root.size() == len(adds)
     assert tree.root == expected

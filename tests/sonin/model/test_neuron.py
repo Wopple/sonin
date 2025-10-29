@@ -9,25 +9,27 @@ from sonin.model.neuron import Axon, TetanicPeriod
     [
         (2, 2, 0, 1, False),
         (2, 2, 0, 2, False),
-        (2, 2, 0, 3, True),
+        (2, 2, 0, 3, True),  # active
         (2, 2, 0, 4, True),
-        (2, 2, 0, 5, False),
+        (2, 2, 0, 5, False),  # inactive
         (2, 2, 0, 6, False),
         (2, 2, 0, 7, True),
+
         (2, 2, 1, 1, False),
         (2, 2, 1, 2, False),
-        (2, 2, 1, 3, True),
-        (2, 2, 1, 4, False),
+        (2, 2, 1, 3, True),  # active
+        (2, 2, 1, 4, False),  # gap
         (2, 2, 1, 5, True),
-        (2, 2, 1, 6, False),
-        (2, 2, 1, 7, False),
+        (2, 2, 1, 6, False),  # gap
+        (2, 2, 1, 7, False),  # inactive
         (2, 2, 1, 8, False),
         (2, 2, 1, 9, True),
+
         (2, 1, 1, 1, False),
         (2, 1, 1, 2, False),
-        (2, 1, 1, 3, True),
-        (2, 1, 1, 4, False),
-        (2, 1, 1, 5, False),
+        (2, 1, 1, 3, True),  # active
+        (2, 1, 1, 4, False),  # gap
+        (2, 1, 1, 5, False),  # inactive
         (2, 1, 1, 6, False),
         (2, 1, 1, 7, True),
     ],
