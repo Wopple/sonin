@@ -11,6 +11,7 @@ from sonin.model.mind import Mind, MindInterface
 from sonin.model.mutation import DnaMutagen
 from sonin.model.neuron import Axon, Neuron
 from sonin.model.step import HasStep
+from sonin.sonin_random import Pcg32, Random
 
 type Fitness = int
 
@@ -134,6 +135,9 @@ class PetriDish(BaseModel):
                         max_neuron_strength=dna.max_neuron_strength,
                         axon_range=dna.axon_range,
                         neurons=neurons,
+
+                        # for reproducible initial state
+                        random=Random(rng=Pcg32()),
                     )
 
                     mind.guide_axons()

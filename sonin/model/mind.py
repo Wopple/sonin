@@ -8,7 +8,7 @@ from sonin.model.signal import Signal, SignalCount, SignalProfile
 from sonin.model.step import HasStep
 from sonin.model.synapse import Synapse
 from sonin.sonin_math import div
-from sonin.sonin_random import rand_bool, rand_int
+from sonin.sonin_random import Random
 
 
 def strengthen_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int, max_strength: int):
@@ -59,13 +59,14 @@ class Mind(BaseModel, HasStep):
     axon_range: int
     neurons: Hypercube[Neuron]
     signal_profile: SignalProfile = Field(default_factory=SignalProfile)
+    random: Random = Random()
 
     def random_position(self, center: Vector, distance: int) -> Vector:
         """
         Returns a vector within `distance` city blocks from the center wrapping at the dimension size.
         """
         def random_component(idx: int) -> int:
-            return (center.value[idx] + rand_int(-distance, distance)) % self.dimension_size
+            return (center.value[idx] + self.random.rand_int(-distance, distance)) % self.dimension_size
 
         return Vector(
             value=tuple(random_component(idx) for idx in range(self.n_dimension)),
@@ -86,7 +87,7 @@ class Mind(BaseModel, HasStep):
 
     def randomize_potential(self):
         for n in self.neurons:
-            if rand_bool():
+            if self.random.rand_bool():
                 n.potential = n.activation_level
             else:
                 n.potential = 0
