@@ -654,6 +654,8 @@ class DnaMutagen(Mutagen):
     axon_range_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1, max_value=10))
     refactory_period_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(max_value=5))
     environment_mutagen: EnvironmentMutagen = None
+    incubation_signals_mutagen: SignalValueMutagen = Field(default_factory=SignalValueMutagen)
+    signal_profile_mutagen: SignalProfileMutagen = Field(default_factory=SignalProfileMutagen)
     fate_tree_mutagen: FateTreeMutagen = Field(default_factory=FateTreeMutagen)
 
     def model_post_init(self, context: Any, /):
@@ -685,6 +687,8 @@ class DnaMutagen(Mutagen):
             axon_range=self.axon_range_mutagen.value,
             refactory_period=self.refactory_period_mutagen.value,
             environment=environment,
+            incubation_signals=self.incubation_signals_mutagen.value,
+            signal_profile=self.signal_profile_mutagen.value,
             fate_tree=self.fate_tree_mutagen.value,
         )
 
@@ -696,5 +700,6 @@ class DnaMutagen(Mutagen):
             self.axon_range_mutagen,
             self.refactory_period_mutagen,
             self.environment_mutagen,
+            self.signal_profile_mutagen,
             self.fate_tree_mutagen,
         ]).mutate(num_mutations)

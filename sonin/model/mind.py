@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sonin.model.hypercube import Hypercube, Shape, Vector
 from sonin.model.neuron import ACCEPTING, Neuron
 from sonin.model.signal import Signal, SignalCount, SignalProfile
+from sonin.model.step import HasStep
 from sonin.model.synapse import Synapse
 from sonin.sonin_math import div
 from sonin.sonin_random import rand_bool, rand_int
@@ -50,7 +51,7 @@ def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int):
             del post_neuron.pre_synapses[pre_index]
 
 
-class Mind(BaseModel):
+class Mind(BaseModel, HasStep):
     n_synapse: int
     n_dimension: int
     dimension_size: int
@@ -211,7 +212,7 @@ class Mind(BaseModel):
                 syn.strengthen(1)
 
 
-class MindInterface(BaseModel):
+class MindInterface(BaseModel, HasStep):
     mind: Mind
     input_shape: Shape
     output_shape: Shape
@@ -247,8 +248,14 @@ class MindInterface(BaseModel):
     def input(self, c_time: int, value: int):
         MindInterface.activate_by(c_time, value, self.input_neurons)
 
-    def output(self, c_time: int, value: int):
-        MindInterface.activate_by(c_time, value, self.output_neurons)
+    def output(self) -> int:
+        value = 0
+
+        for i in range(len(self.output_neurons)):
+            if self.output_neurons[i].activated:
+                value |= 1 << i
+
+        return value
 
     def reward(self, c_time: int, value: int):
         MindInterface.activate_by(c_time, value, self.reward_neurons)

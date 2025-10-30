@@ -5,6 +5,7 @@ from sonin.model.fate import FateTree
 from sonin.model.hypercube import Vector
 from sonin.model.mind import strengthen_connection, weaken_connection
 from sonin.model.neuron import Axon, Neuron
+from sonin.model.signal import SignalProfile
 from sonin.model.stimulation import Stimulation
 
 
@@ -24,6 +25,8 @@ def dna(n_dimension: int) -> Dna:
         axon_range=1,
         refactory_period=1,
         environment=[],
+        incubation_signals={},
+        signal_profile=SignalProfile(affinities={}),
         fate_tree=FateTree(),
     )
 

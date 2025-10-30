@@ -3,6 +3,7 @@ from pytest import mark
 from sonin.model.dna import Dna
 from sonin.model.fate import FateTree
 from sonin.model.hypercube import CityShape, CubeShape, Hypercube, Vector
+from sonin.model.signal import SignalProfile
 
 DIMENSION_SIZE = 50
 
@@ -17,6 +18,8 @@ def dna(n_dimension: int, dimension_size: int) -> Dna:
         axon_range=1,
         refactory_period=1,
         environment=[],
+        incubation_signals={},
+        signal_profile=SignalProfile(affinities={}),
         fate_tree=FateTree(),
     )
 

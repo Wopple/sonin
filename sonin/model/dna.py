@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 from sonin.model.fate import FateTree
 from sonin.model.hypercube import Vector
-from sonin.model.signal import Signal, SignalCount
+from sonin.model.signal import Signal, SignalCount, SignalProfile
 
 
 class Dna(BaseModel):
@@ -14,4 +14,6 @@ class Dna(BaseModel):
     axon_range: int
     refactory_period: int
     environment: list[tuple[Signal, SignalCount, Vector]]
+    incubation_signals: dict[Signal, SignalCount]
+    signal_profile: SignalProfile
     fate_tree: FateTree

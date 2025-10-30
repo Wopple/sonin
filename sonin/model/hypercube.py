@@ -208,8 +208,6 @@ class CubeShape(Shape):
     [][][][][]
     """
 
-    distance: int = Field(default=0, ge=0)
-
     def positions(self) -> Generator[Vector, None, None]:
         # Iterate through layers. Recursively call for each lower dimension with the size of the layer.
         def iterate(
@@ -252,8 +250,6 @@ class CityShape(Shape):
       [][][]
         []
     """
-
-    distance: int = Field(default=0, ge=0)
 
     def positions(self) -> Generator[Vector, None, None]:
         # Iterate through layers. Recursively call for each lower dimension with the size of the layer.

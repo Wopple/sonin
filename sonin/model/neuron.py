@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Vector
 from sonin.model.signal import Signal, SignalCount
+from sonin.model.step import HasStep
 from sonin.model.stimulation import Stimulation
 from sonin.model.synapse import Synapse
 
@@ -14,7 +15,7 @@ ACCEPTING = 0
 REFACTORY = 1
 
 
-class TetanicPeriod(BaseModel):
+class TetanicPeriod(BaseModel, HasStep):
     """ Represents a periodic schedule of tetanic activations """
 
     # Number of dormant steps before tetanic activations
@@ -65,7 +66,7 @@ class Axon(BaseModel):
         self.direction = (double_center - double_position).city_unit()
 
 
-class Neuron(BaseModel):
+class Neuron(BaseModel, HasStep):
     # Vector of the neuron in the mind
     position: Vector
 

@@ -117,7 +117,9 @@ from sonin.sonin_random import seed
 
 # Model
 #   - Dependency Graph
-#     - Dna > Mutagen
+#     - PetriDish > Mutagen
+#     - PetriDish > MindInterface
+#     - MindInterface > Mind
 #     - Mutagen > Mutable Models
 #     - Incubator > Hypercube
 #     - Mind > Hypercube
@@ -129,63 +131,62 @@ from sonin.sonin_random import seed
 #     - Facilitation > Gear
 
 seed(1)
+dimension_size = 10
+
+def vec(*coords: int) -> Vector:
+    return Vector(value=tuple(coords), dimension_size=dimension_size)
+
 
 dna = Dna(
     n_dimension=2,
-    dimension_size=10,
+    dimension_size=dimension_size,
     n_synapse=4,
     activation_level=24,
     max_neuron_strength=12,
     axon_range=2,
     refactory_period=0,
-    environment=[],
+    environment=[
+        (1, 100, vec(0, 0)),
+        (1, 200, vec(7, 7)),
+        (2, 100, vec(5, 0)),
+        (2, 300, vec(0, 5)),
+        (3, 200, vec(3, 1)),
+        (3, 300, vec(3, 4)),
+    ],
+    incubation_signals={
+        1: 300,
+        2: 300,
+        3: 300,
+    },
+    signal_profile=SignalProfile(affinities={
+        1: {
+            1: 1,
+            2: -1,
+            3: 3,
+        },
+        2: {
+            1: -3,
+            2: 2,
+            3: 3,
+        },
+        3: {
+            1: -2,
+            2: -2,
+            3: 1,
+        },
+    }),
     fate_tree=FateTree(),
 )
 
 
-def vec(*coords: int) -> Vector:
-    return Vector(value=tuple(coords), dimension_size=dna.dimension_size)
-
-
-environment: list[tuple[Signal, SignalCount, Vector]] = [
-    (1, 100, vec(0, 0)),
-    (1, 200, vec(7, 7)),
-    (2, 100, vec(5, 0)),
-    (2, 300, vec(0, 5)),
-    (3, 200, vec(3, 1)),
-    (3, 300, vec(3, 4)),
-]
-
-signal_profile = SignalProfile(affinities={
-    1: {
-        1: 1,
-        2: -1,
-        3: 3,
-    },
-    2: {
-        1: -3,
-        2: 2,
-        3: 3,
-    },
-    3: {
-        1: -2,
-        2: -2,
-        3: 1,
-    },
-})
-
 incubator = Incubator(
     n_dimension=dna.n_dimension,
     dimension_size=dna.dimension_size,
-    environment=environment,
-    signal_profile=signal_profile,
+    environment=dna.environment,
+    signal_profile=dna.signal_profile,
 )
 
-incubator.initialize({
-    1: 300,
-    2: 300,
-    3: 300,
-})
+incubator.initialize(dna.incubation_signals)
 
 incubator.incubate()
 
