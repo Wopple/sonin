@@ -1,6 +1,8 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
-from sonin.model.hypercube import Hypercube, Vector
+from sonin.model.hypercube import Hypercube, Shape, Vector
 from sonin.model.neuron import ACCEPTING, Neuron
 from sonin.model.signal import Signal, SignalCount, SignalProfile
 from sonin.model.synapse import Synapse
@@ -207,3 +209,49 @@ class Mind(BaseModel):
 
             if pre_n.position.index != post_n.position.index and post_n.activated:
                 syn.strengthen(1)
+
+
+class MindInterface(BaseModel):
+    mind: Mind
+    input_shape: Shape
+    output_shape: Shape
+    reward_shape: Shape
+    punish_shape: Shape
+    input_neurons: list[Neuron] = None
+    output_neurons: list[Neuron] = None
+    reward_neurons: list[Neuron] = None
+    punish_neurons: list[Neuron] = None
+
+    def model_post_init(self, context: Any, /):
+        self.input_neurons = [self.mind.neurons.get(p) for p in self.input_shape.positions()]
+        self.output_neurons = [self.mind.neurons.get(p) for p in self.output_shape.positions()]
+        self.reward_neurons = [self.mind.neurons.get(p) for p in self.reward_shape.positions()]
+        self.punish_neurons = [self.mind.neurons.get(p) for p in self.punish_shape.positions()]
+
+    def step(self, c_time: int):
+        self.mind.step(c_time)
+
+    @staticmethod
+    def activate_by(c_time: int, value: int, neurons: list[Neuron]):
+        """
+        Each bit in value is mapped to a neuron to activate. In this way, some neurons are activated only when value
+        is high. That can be interpreted as a more potent signal.
+        """
+        # If the value is larger than the value which activates all neurons, it should also activate all neurons.
+        value = min(value, (2 << len(neurons)) - 1)
+
+        for i in range(len(neurons)):
+            if value & (1 << i):
+                neurons[i].activate(c_time)
+
+    def input(self, c_time: int, value: int):
+        MindInterface.activate_by(c_time, value, self.input_neurons)
+
+    def output(self, c_time: int, value: int):
+        MindInterface.activate_by(c_time, value, self.output_neurons)
+
+    def reward(self, c_time: int, value: int):
+        MindInterface.activate_by(c_time, value, self.reward_neurons)
+
+    def punish(self, c_time: int, value: int):
+        MindInterface.activate_by(c_time, value, self.punish_neurons)

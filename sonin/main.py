@@ -131,12 +131,15 @@ from sonin.sonin_random import seed
 seed(1)
 
 dna = Dna(
-    min_neurons=100,
-    n_synapse=4,
     n_dimension=2,
+    dimension_size=10,
+    n_synapse=4,
     activation_level=24,
     max_neuron_strength=12,
     axon_range=2,
+    refactory_period=0,
+    environment=[],
+    fate_tree=FateTree(),
 )
 
 

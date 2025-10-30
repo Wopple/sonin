@@ -1,9 +1,24 @@
 from pytest import mark
 
 from sonin.model.dna import Dna
-from sonin.model.hypercube import Hypercube, Vector
+from sonin.model.fate import FateTree
+from sonin.model.hypercube import CityShape, CubeShape, Hypercube, Vector
 
 DIMENSION_SIZE = 50
+
+
+def dna(n_dimension: int, dimension_size: int) -> Dna:
+    return Dna(
+        n_dimension=n_dimension,
+        dimension_size=dimension_size,
+        n_synapse=1,
+        activation_level=1,
+        max_neuron_strength=1,
+        axon_range=1,
+        refactory_period=1,
+        environment=[],
+        fate_tree=FateTree(),
+    )
 
 
 @mark.parametrize(
@@ -199,15 +214,252 @@ def test_city_unit(before: tuple[int, ...], expected: tuple[int, ...]):
     assert actual == expected
 
 
+@mark.parametrize(
+    "center, size, expected",
+    [
+        (Vector.of([0], 10), 1, [(0,)]),
+        (Vector.of([0, 0], 10), 1, [(0, 0)]),
+        (Vector.of([0, 0, 0], 10), 1, [(0, 0, 0)]),
+
+        (Vector.of([0], 10), 2, [(0,), (1,)]),
+
+        (Vector.of([0, 0], 10), 2, [
+            (0, 0),
+            (1, 0),
+            (0, 1),
+            (1, 1),
+        ]),
+
+        # [][] [][]
+        # CT[] [][]
+        (Vector.of([0, 0, 0], 10), 2, [
+            (x, y, z)
+            for z in range(2)
+            for y in range(2)
+            for x in range(2)
+        ]),
+
+        # __[][] __[]CT
+        # __[][] __[][]
+        # ______ ______
+        (Vector.of([2, 2, 2], 3), 2, [
+            (x + 1, y + 1, z + 1)
+            for z in range(2)
+            for y in range(2)
+            for x in range(2)
+        ]),
+
+        (Vector.of([0], 10), 3, [(0,), (1,), (2,)]),
+
+        # [][][]
+        # [][][]
+        # CT[][]
+        (Vector.of([0, 0], 10), 3, [
+            (x, y)
+            for y in range(3)
+            for x in range(3)
+        ]),
+
+        # [][][] [][][] [][][]
+        # [][][] [][][] [][][]
+        # CT[][] [][][] [][][]
+        (Vector.of([0, 0, 0], 10), 3, [
+            (x, y, z)
+            for z in range(3)
+            for y in range(3)
+            for x in range(3)
+        ]),
+
+        # []CT[][]
+        (Vector.of([1], 10), 3, [(0,), (1,), (2,), (3,)]),
+
+        # [][][][]
+        # [][][][]
+        # []CT[][]
+        (Vector.of([1, 0], 10), 3, [
+            (x, y)
+            for y in range(3)
+            for x in range(4)
+        ]),
+
+        # [][][][] [][][][] [][][][] [][][][]
+        # [][][][] [][][][] [][][][] [][][][]
+        # [][][][] []CT[][] [][][][] [][][][]
+        (Vector.of([1, 0, 0], 10), 3, [
+            (x, y, z)
+            for z in range(3)
+            for y in range(3)
+            for x in range(4)
+        ]),
+
+        # ____________ __[][][][][] __[][][][][] __[][][][][] __[][][][][] __[][][][][]
+        # ____________ __[][][][][] __[][][][][] __[][][][][] __[][][][][] __[][][][][]
+        # ____________ __[][][][][] __[][][][][] __[][]CT[][] __[][][][][] __[][][][][]
+        # ____________ __[][][][][] __[][][][][] __[][][][][] __[][][][][] __[][][][][]
+        # ____________ __[][][][][] __[][][][][] __[][][][][] __[][][][][] __[][][][][]
+        # ____________ ____________ ____________ ____________ ____________ ____________
+        (Vector.of([3, 3, 3], 10), 3, [
+            (x + 1, y + 1, z + 1)
+            for z in range(5)
+            for y in range(5)
+            for x in range(5)
+        ]),
+    ],
+)
+def test_cube_shape(center: Vector, size: int, expected: list[tuple[int, ...]]):
+    shape = CubeShape(center=center, size=size)
+    actual = [position.value for position in shape.positions()]
+
+    assert actual == expected
+
+
+@mark.parametrize(
+    "center, size, expected",
+    [
+        (Vector.of([0], 10), 1, [(0,)]),
+        (Vector.of([0, 0], 10), 1, [(0, 0)]),
+        (Vector.of([0, 0, 0], 10), 1, [(0, 0, 0)]),
+
+        (Vector.of([0], 10), 2, [(0,), (1,)]),
+
+        (Vector.of([0, 0], 10), 2, [
+            (0, 0),
+            (1, 0),
+            (0, 1),
+        ]),
+
+        # []__ ____
+        # CT[] []__
+        (Vector.of([0, 0, 0], 10), 2, [
+            (0, 0, 0),
+            (1, 0, 0),
+            (0, 1, 0),
+            (0, 0, 1),
+        ]),
+
+        # __[] []CT
+        # ____ __[]
+        (Vector.of([1, 1, 1], 2), 2, [
+            (1, 1, 0),
+            (1, 0, 1),
+            (0, 1, 1),
+            (1, 1, 1),
+        ]),
+
+        (Vector.of([0], 10), 3, [(0,), (1,), (2,)]),
+
+        # []____
+        # [][]__
+        # CT[][]
+        (Vector.of([0, 0], 10), 3, [
+            (0, 0),
+            (1, 0),
+            (2, 0),
+            (0, 1),
+            (1, 1),
+            (0, 2),
+        ]),
+
+        # []____ ______ ______
+        # [][]__ []____ ______
+        # CT[][] [][]__ []____
+        (Vector.of([0, 0, 0], 10), 3, [
+            (0, 0, 0),
+            (1, 0, 0),
+            (2, 0, 0),
+            (0, 1, 0),
+            (1, 1, 0),
+            (0, 2, 0),
+            (0, 0, 1),
+            (1, 0, 1),
+            (0, 1, 1),
+            (0, 0, 2),
+        ]),
+
+        # []CT[][]
+        (Vector.of([1], 10), 3, [(0,), (1,), (2,), (3,)]),
+
+        # __[]____
+        # [][][]__
+        # []CT[][]
+        (Vector.of([1, 0], 10), 3, [
+            (0, 0),
+            (1, 0),
+            (2, 0),
+            (3, 0),
+            (0, 1),
+            (1, 1),
+            (2, 1),
+            (1, 2),
+        ]),
+
+        # __[]____ ________ ________
+        # [][][]__ __[]____ ________
+        # []CT[][] [][][]__ __[]____
+        (Vector.of([1, 0, 0], 10), 3, [
+            (0, 0, 0),
+            (1, 0, 0),
+            (2, 0, 0),
+            (3, 0, 0),
+            (0, 1, 0),
+            (1, 1, 0),
+            (2, 1, 0),
+            (1, 2, 0),
+            (0, 0, 1),
+            (1, 0, 1),
+            (2, 0, 1),
+            (1, 1, 1),
+            (1, 0, 2),
+        ]),
+
+        # ____________ ____________ ____________ ______[]____ ____________ ____________
+        # ____________ ____________ ______[]____ ____[][][]__ ______[]____ ____________
+        # ____________ ______[]____ ____[][][]__ __[][]CT[][] ____[][][]__ ______[]____
+        # ____________ ____________ ______[]____ ____[][][]__ ______[]____ ____________
+        # ____________ ____________ ____________ ______[]____ ____________ ____________
+        # ____________ ____________ ____________ ____________ ____________ ____________
+        (Vector.of([3, 3, 3], 10), 3, [
+            (3, 3, 1),
+            (3, 2, 2),
+            (2, 3, 2),
+            (3, 3, 2),
+            (4, 3, 2),
+            (3, 4, 2),
+            (3, 1, 3),
+            (2, 2, 3),
+            (3, 2, 3),
+            (4, 2, 3),
+            (1, 3, 3),
+            (2, 3, 3),
+            (3, 3, 3),
+            (4, 3, 3),
+            (5, 3, 3),
+            (2, 4, 3),
+            (3, 4, 3),
+            (4, 4, 3),
+            (3, 5, 3),
+            (3, 2, 4),
+            (2, 3, 4),
+            (3, 3, 4),
+            (4, 3, 4),
+            (3, 4, 4),
+            (3, 3, 5),
+        ]),
+    ],
+)
+def test_city_shape(center: Vector, size: int, expected: list[tuple[int, ...]]):
+    shape = CityShape(center=center, size=size)
+    actual = [position.value for position in shape.positions()]
+
+    assert actual == expected
+
+
 def test_initialize():
-    dna = Dna(
-        min_neurons=27,
-        n_dimension=3,
-    )
+    test_dna = dna(3, 3)
 
     hypercube = Hypercube(
-        n_dimension=dna.n_dimension,
-        dimension_size=dna.dimension_size,
+        n_dimension=test_dna.n_dimension,
+        dimension_size=test_dna.dimension_size,
     )
 
     hypercube.initialize(lambda position: position.value)
@@ -246,16 +498,18 @@ def test_initialize():
 @mark.parametrize(
     'dna, expected_center',
     [
-        (Dna(min_neurons=1, n_dimension=1), [(0,)]),
-        (Dna(min_neurons=2, n_dimension=1), [(0,), (1,)]),
-        (Dna(min_neurons=3, n_dimension=1), [(1,)]),
-        (Dna(min_neurons=4, n_dimension=1), [(1,), (2,)]),
-        (Dna(min_neurons=1, n_dimension=2), [(0, 0)]),
-        (Dna(min_neurons=4, n_dimension=2), [(0, 0), (0, 1), (1, 0), (1, 1)]),
-        (Dna(min_neurons=9, n_dimension=2), [(1, 1)]),
-        (Dna(min_neurons=16, n_dimension=2), [(1, 1), (1, 2), (2, 1), (2, 2)]),
-        (Dna(min_neurons=1, n_dimension=3), [(0, 0, 0)]),
-        (Dna(min_neurons=8, n_dimension=3), [
+        (dna(1, 1), [(0,)]),
+        (dna(1, 2), [(0,), (1,)]),
+        (dna(1, 3), [(1,)]),
+        (dna(1, 4), [(1,), (2,)]),
+
+        (dna(2, 1), [(0, 0)]),
+        (dna(2, 2), [(0, 0), (0, 1), (1, 0), (1, 1)]),
+        (dna(2, 3), [(1, 1)]),
+        (dna(2, 4), [(1, 1), (1, 2), (2, 1), (2, 2)]),
+
+        (dna(3, 1), [(0, 0, 0)]),
+        (dna(3, 2), [
             (0, 0, 0),
             (0, 0, 1),
             (0, 1, 0),
@@ -265,8 +519,8 @@ def test_initialize():
             (1, 1, 0),
             (1, 1, 1),
         ]),
-        (Dna(min_neurons=27, n_dimension=3), [(1, 1, 1)]),
-        (Dna(min_neurons=64, n_dimension=3), [
+        (dna(3, 3), [(1, 1, 1)]),
+        (dna(3, 4), [
             (1, 1, 1),
             (1, 1, 2),
             (1, 2, 1),

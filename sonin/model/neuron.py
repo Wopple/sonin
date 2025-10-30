@@ -118,8 +118,11 @@ class Neuron(BaseModel):
         self.stimulation.step()
         self.tetanic_period and self.tetanic_period.step(c_time)
 
+        # if already activated (e.g. by input), skip
+        if self.activated:
+            pass
         # activate if potential is exceeded or there is a tetanic activation
-        if self.state == ACCEPTING:
+        elif self.state == ACCEPTING:
             is_tetanic = self.tetanic_period and self.tetanic_period.is_active(c_time)
 
             if self.potential >= self.activation_level or is_tetanic:

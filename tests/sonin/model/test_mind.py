@@ -1,6 +1,7 @@
 from pytest import fixture
 
 from sonin.model.dna import Dna
+from sonin.model.fate import FateTree
 from sonin.model.hypercube import Vector
 from sonin.model.mind import strengthen_connection, weaken_connection
 from sonin.model.neuron import Axon, Neuron
@@ -14,7 +15,17 @@ def n_dimension() -> int:
 
 @fixture
 def dna(n_dimension: int) -> Dna:
-    return Dna(min_neurons=2, n_dimension=n_dimension)
+    return Dna(
+        n_dimension=n_dimension,
+        dimension_size=2,
+        n_synapse=1,
+        activation_level=1,
+        max_neuron_strength=1,
+        axon_range=1,
+        refactory_period=1,
+        environment=[],
+        fate_tree=FateTree(),
+    )
 
 
 @fixture

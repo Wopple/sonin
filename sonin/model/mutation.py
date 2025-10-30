@@ -3,11 +3,14 @@ from typing import Any, Callable, ClassVar, Self
 
 from pydantic import BaseModel, Field
 
+from sonin.model.dna import Dna
 from sonin.model.facilitation import Facilitation
 from sonin.model.fate import BinaryFate, Fate, FateTree, IsLeft, IsLower
+from sonin.model.hypercube import Vector
 from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import Signal, SignalCount, SignalProfile
 from sonin.model.stimulation import SnapBack, Stimulation
+from sonin.sonin_math import div
 from sonin.sonin_random import choice, rand_bool, rand_int, rand_sign, shuffle
 from sonin.tree import BinaryTree
 
@@ -606,7 +609,6 @@ class FateTreeMutagen(Mutagen, BinaryTree):
     new_weight: int = 1
     remove_weight: int = 1
     update_weight: int = 14
-    is_next_left: Callable[[], bool] = Field(default=rand_bool, exclude=True)
 
     # BinaryTree
     root: FateMutagen | BinaryFateMutagen | None = None
@@ -641,3 +643,58 @@ class FateTreeMutagen(Mutagen, BinaryTree):
                 # perform an in-place mutation
                 update.bool_value = False
                 self.root.mutate(1)
+
+
+class DnaMutagen(Mutagen):
+    n_dimension: int = 2
+    dimension_size: int = 10
+    n_synapse_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1, max_value=10))
+    activation_level_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
+    max_neuron_strength_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
+    axon_range_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1, max_value=10))
+    refactory_period_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(max_value=5))
+    environment_mutagen: EnvironmentMutagen = None
+    fate_tree_mutagen: FateTreeMutagen = Field(default_factory=FateTreeMutagen)
+
+    def model_post_init(self, context: Any, /):
+        if self.environment_mutagen is None:
+            self.environment_mutagen = EnvironmentMutagen(n_dimension=self.n_dimension)
+
+    @property
+    def value(self) -> Dna:
+        raw_environment = self.environment_mutagen.value
+
+        environment: list[tuple[Signal, SignalCount, Vector]] = [
+            (
+                signal,
+                signal_count,
+                Vector.of(
+                    [div(self.dimension_size * numerator, numerator + delta) for numerator, delta in position],
+                    self.dimension_size,
+                ),
+            )
+            for (signal, position), signal_count in raw_environment.items()
+        ]
+
+        return Dna(
+            n_dimension=self.n_dimension,
+            dimension_size=self.dimension_size,
+            n_synapse=self.n_synapse_mutagen.value,
+            activation_level=self.activation_level_mutagen.value,
+            max_neuron_strength=self.max_neuron_strength_mutagen.value,
+            axon_range=self.axon_range_mutagen.value,
+            refactory_period=self.refactory_period_mutagen.value,
+            environment=environment,
+            fate_tree=self.fate_tree_mutagen.value,
+        )
+
+    def mutate(self, num_mutations: int):
+        Mutator(mutagens=[
+            self.n_synapse_mutagen,
+            self.activation_level_mutagen,
+            self.max_neuron_strength_mutagen,
+            self.axon_range_mutagen,
+            self.refactory_period_mutagen,
+            self.environment_mutagen,
+            self.fate_tree_mutagen,
+        ]).mutate(num_mutations)

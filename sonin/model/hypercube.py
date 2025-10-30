@@ -180,6 +180,105 @@ class Vector(BaseModel):
         return Vector.of(tuple(approximate_coordinate(c) for c in self.value), self.dimension_size)
 
 
+class Shape(BaseModel):
+    center: Vector
+    size: int = Field(ge=1)
+
+    def positions(self) -> Generator[Vector, None, None]:
+        raise NotImplementedError(f"{self.__class__.__name__}.positions")
+
+
+class CubeShape(Shape):
+    """
+    Produces shapes like:
+
+    size: 1
+    CT
+
+    size: 2
+    [][][]
+    []CT[]
+    [][][]
+
+    size: 3
+    [][][][][]
+    [][][][][]
+    [][]CT[][]
+    [][][][][]
+    [][][][][]
+    """
+
+    distance: int = Field(default=0, ge=0)
+
+    def positions(self) -> Generator[Vector, None, None]:
+        # Iterate through layers. Recursively call for each lower dimension with the size of the layer.
+        def iterate(
+            dimension: int,
+            position: tuple[int, ...],
+        ) -> Generator[tuple[int, ...], None, None]:
+            for idx in range(self.size * 2 - 1):
+                relative_idx = idx - self.size + 1
+                absolute_idx = relative_idx + self.center.value[dimension]
+
+                if dimension == 0:
+                    yield (absolute_idx,) + position
+                else:
+                    yield from iterate(dimension - 1, (absolute_idx,) + position)
+
+        # only yield positions that are in bounds
+        for value in iterate(self.center.n_dimension - 1, ()):
+            candidate_position = Vector.of(value, self.center.dimension_size)
+
+            if not candidate_position.out_of_bounds():
+                yield candidate_position
+
+
+class CityShape(Shape):
+    """
+    Produces shapes like:
+
+    size: 1
+    CT
+
+    size: 2
+      []
+    []CT[]
+      []
+
+    size: 3
+        []
+      [][][]
+    [][]CT[][]
+      [][][]
+        []
+    """
+
+    distance: int = Field(default=0, ge=0)
+
+    def positions(self) -> Generator[Vector, None, None]:
+        # Iterate through layers. Recursively call for each lower dimension with the size of the layer.
+        def iterate(
+            dimension: int,
+            size: int,
+            position: tuple[int, ...],
+        ) -> Generator[tuple[int, ...], None, None]:
+            for idx in range(size * 2 - 1):
+                relative_idx = idx - size + 1
+                absolute_idx = relative_idx + self.center.value[dimension]
+
+                if dimension == 0:
+                    yield (absolute_idx,) + position
+                else:
+                    yield from iterate(dimension - 1, size - abs(relative_idx), (absolute_idx,) + position)
+
+        # only yield positions that are in bounds
+        for value in iterate(self.center.n_dimension - 1, self.size, ()):
+            candidate_position = Vector.of(value, self.center.dimension_size)
+
+            if not candidate_position.out_of_bounds():
+                yield candidate_position
+
+
 class Hypercube[T](BaseModel):
     n_dimension: int
     dimension_size: int
