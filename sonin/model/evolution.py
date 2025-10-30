@@ -88,78 +88,27 @@ class PetriDish(BaseModel):
                     descendant = sample.model_copy(deep=True)
                     descendant.mutate(self.num_mutations)
                     dna: Dna = descendant.value
-
-                    # perform cell division
-                    incubator = Incubator(
-                        n_dimension=dna.n_dimension,
-                        dimension_size=dna.dimension_size,
-                        environment=dna.environment,
-                        signal_profile=dna.signal_profile,
-                    )
-
-                    incubator.initialize(dna.incubation_signals)
-                    incubator.incubate()
-
-                    # determine cell fates
-                    neuron_items = []
-
-                    for cell in incubator.cells:
-                        fate = dna.fate_tree.get_fate(cell.signals)
-
-                        neuron_items.append(Neuron(
-                            position=cell.position,
-                            axon=Axon(
-                                position=cell.position,
-                                n_dimension=dna.n_dimension,
-                                dimension_size=dna.dimension_size,
-                            ),
-                            signals=cell.signals,
-                            excites=fate.excites,
-                            activation_level=fate.activation_level,
-                            refactory_period=fate.refactory_period,
-                            tetanic_period=fate.tetanic_period,
-                            stimulation=fate.stimulation,
-                        ))
-
-                    # construct the mind
-                    neurons = Hypercube(
-                        n_dimension=dna.n_dimension,
-                        dimension_size=dna.dimension_size,
-                        items=neuron_items,
-                    )
-
-                    mind = Mind(
-                        n_synapse=dna.n_synapse,
-                        n_dimension=dna.n_dimension,
-                        dimension_size=dna.dimension_size,
-                        max_neuron_strength=dna.max_neuron_strength,
-                        axon_range=dna.axon_range,
-                        neurons=neurons,
-
-                        # for reproducible initial state
-                        random=Random(rng=Pcg32()),
-                    )
-
-                    mind.guide_axons()
-                    mind.randomize_synapses()
+                    mind: Mind = dna.build_mind()
 
                     # configure the interface
+                    dimension_size = dna.dimension_size
+
                     mind_interface = MindInterface(
                         mind=mind,
                         input_shape=CityShape(
-                            center=Vector.of((0, 0), dna.dimension_size),
+                            center=Vector.of((0, 0), dimension_size),
                             size=2,
                         ),
                         output_shape=CityShape(
-                            center=Vector.of((dna.dimension_size - 1, 0), dna.dimension_size),
+                            center=Vector.of((dimension_size - 1, 0), dimension_size),
                             size=2,
                         ),
                         reward_shape=CityShape(
-                            center=Vector.of((0, dna.dimension_size - 1), dna.dimension_size),
+                            center=Vector.of((0, dimension_size - 1), dimension_size),
                             size=2,
                         ),
                         punish_shape=CityShape(
-                            center=Vector.of((dna.dimension_size - 1, dna.dimension_size - 1), dna.dimension_size),
+                            center=Vector.of((dimension_size - 1, dimension_size - 1), dimension_size),
                             size=2,
                         ),
                     )
@@ -179,4 +128,8 @@ class PetriDish(BaseModel):
                     self.samples[descendant] = self.fitness_criteria.measure()
 
             # keep the most fit
-            self.samples = dict(heapq.nlargest(self.sample_retention, self.samples.items(), key=lambda x: x[1]))
+            self.samples = dict(heapq.nlargest(
+                self.sample_retention,
+                self.samples.items(),
+                key=lambda x: x[1],
+            ))

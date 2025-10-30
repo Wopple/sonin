@@ -1,10 +1,9 @@
 from sonin.model.dna import Dna
 from sonin.model.fate import BinaryFate, Fate, FateTree
-from sonin.model.growth import Incubator
-from sonin.model.hypercube import Hypercube, Vector
+from sonin.model.hypercube import Vector
 from sonin.model.mind import Mind
-from sonin.model.neuron import Axon, Neuron, TetanicPeriod
-from sonin.model.signal import Signal, SignalCount, SignalProfile
+from sonin.model.neuron import TetanicPeriod
+from sonin.model.signal import SignalProfile
 from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.sonin_random import seed
 
@@ -133,62 +132,10 @@ from sonin.sonin_random import seed
 seed(1)
 dimension_size = 10
 
+
 def vec(*coords: int) -> Vector:
     return Vector(value=tuple(coords), dimension_size=dimension_size)
 
-
-dna = Dna(
-    n_dimension=2,
-    dimension_size=dimension_size,
-    n_synapse=4,
-    activation_level=24,
-    max_neuron_strength=12,
-    axon_range=2,
-    refactory_period=0,
-    environment=[
-        (1, 100, vec(0, 0)),
-        (1, 200, vec(7, 7)),
-        (2, 100, vec(5, 0)),
-        (2, 300, vec(0, 5)),
-        (3, 200, vec(3, 1)),
-        (3, 300, vec(3, 4)),
-    ],
-    incubation_signals={
-        1: 300,
-        2: 300,
-        3: 300,
-    },
-    signal_profile=SignalProfile(affinities={
-        1: {
-            1: 1,
-            2: -1,
-            3: 3,
-        },
-        2: {
-            1: -3,
-            2: 2,
-            3: 3,
-        },
-        3: {
-            1: -2,
-            2: -2,
-            3: 1,
-        },
-    }),
-    fate_tree=FateTree(),
-)
-
-
-incubator = Incubator(
-    n_dimension=dna.n_dimension,
-    dimension_size=dna.dimension_size,
-    environment=dna.environment,
-    signal_profile=dna.signal_profile,
-)
-
-incubator.initialize(dna.incubation_signals)
-
-incubator.incubate()
 
 fate_1 = Fate(
     excites=True,
@@ -235,44 +182,48 @@ binary_fate_1 = BinaryFate(
     },
 )
 
-fate_tree = FateTree(root=binary_fate_1)
-neuron_items = []
-
-for cell in incubator.cells:
-    fate = fate_tree.get_fate(cell.signals)
-
-    neuron_items.append(Neuron(
-        position=cell.position,
-        axon=Axon(
-            position=cell.position,
-            n_dimension=dna.n_dimension,
-            dimension_size=dna.dimension_size,
-        ),
-        signals=cell.signals,
-        excites=fate.excites,
-        activation_level=fate.activation_level,
-        refactory_period=fate.refactory_period,
-        tetanic_period=fate.tetanic_period,
-        stimulation=fate.stimulation,
-    ))
-
-neurons = Hypercube(
-    n_dimension=dna.n_dimension,
-    dimension_size=dna.dimension_size,
-    items=neuron_items,
+dna = Dna(
+    n_dimension=2,
+    dimension_size=dimension_size,
+    n_synapse=4,
+    activation_level=24,
+    max_neuron_strength=12,
+    axon_range=2,
+    refactory_period=0,
+    environment=[
+        (1, 100, vec(0, 0)),
+        (1, 200, vec(7, 7)),
+        (2, 100, vec(5, 0)),
+        (2, 300, vec(0, 5)),
+        (3, 200, vec(3, 1)),
+        (3, 300, vec(3, 4)),
+    ],
+    incubation_signals={
+        1: 300,
+        2: 300,
+        3: 300,
+    },
+    signal_profile=SignalProfile(affinities={
+        1: {
+            1: 1,
+            2: -1,
+            3: 3,
+        },
+        2: {
+            1: -3,
+            2: 2,
+            3: 3,
+        },
+        3: {
+            1: -2,
+            2: -2,
+            3: 1,
+        },
+    }),
+    fate_tree=FateTree(root=binary_fate_1),
 )
 
-mind = Mind(
-    n_synapse=dna.n_synapse,
-    n_dimension=dna.n_dimension,
-    dimension_size=dna.dimension_size,
-    max_neuron_strength=dna.max_neuron_strength,
-    axon_range=dna.axon_range,
-    neurons=neurons,
-)
-
-mind.guide_axons()
-mind.randomize_synapses()
+mind: Mind = dna.build_mind()
 mind.randomize_potential()
 
 input_neurons = mind.neurons.items[:6]
