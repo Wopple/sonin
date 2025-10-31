@@ -59,7 +59,10 @@ class Mind(BaseModel, HasStep):
     axon_range: int
     neurons: Hypercube[Neuron]
     signal_profile: SignalProfile = Field(default_factory=SignalProfile)
-    random: Random = Random()
+    random: Random = Field(default_factory=Random)
+    num_activations: int = 0
+    activation_set: list[int] = Field(default_factory=list)
+    print_activations: bool = False
 
     def random_position(self, center: Vector, distance: int) -> Vector:
         """
@@ -150,11 +153,22 @@ class Mind(BaseModel, HasStep):
         `c_time` is a monotonically increasing step number.
         """
 
+        self.num_activations = 0
+        self.activation_set = []
+
         # Iterate multiple times to avoid reading from and writing to the same data.
         # This makes the algorithm trivial to parallelize at a later time.
 
-        for n in self.neurons:
+        for idx, n in enumerate(self.neurons):
+            previous_activated = n.activated
             n.step(c_time)
+
+            if idx % (2 ** 64) == 0:
+                self.activation_set.append(0)
+
+            if (not previous_activated) and n.activated:
+                self.num_activations += 1
+                self.activation_set[-1] |= 1 << idx
 
             # prevent overstimulation
             if n.stimulation and n.stimulation.value > 100 and len(n.pre_synapses) > 0:
@@ -190,6 +204,18 @@ class Mind(BaseModel, HasStep):
             if n.activated:
                 self.propagate_potential(n)
                 self.strengthen_simultaneous_activation(n)
+
+        if self.print_activations:
+            s = ''
+
+            for x in range(self.dimension_size):
+                for y in range(self.dimension_size):
+                    s += '[]' if self.neurons.get((x, y)).activated else '  '
+
+                s += '\n'
+
+            print((self.num_activations, self.activation_set))
+            print(s)
 
         for n in self.neurons:
             if n.activated:

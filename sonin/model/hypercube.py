@@ -181,8 +181,8 @@ class Vector(BaseModel):
 
 
 class Shape(BaseModel):
-    center: Vector
-    size: int = Field(ge=1)
+    center: Vector | None = None
+    size: int = Field(default=1, ge=1)
 
     def positions(self) -> Generator[Vector, None, None]:
         raise NotImplementedError(f"{self.__class__.__name__}.positions")

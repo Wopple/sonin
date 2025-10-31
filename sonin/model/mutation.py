@@ -1,7 +1,7 @@
 from itertools import count
 from typing import Any, Callable, ClassVar, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from sonin.model.dna import Dna
 from sonin.model.facilitation import Facilitation
@@ -347,7 +347,7 @@ class StimulationMutagen(Mutagen):
 
 
 class EnvironmentMutagen(Mutagen):
-    environment: dict[tuple[Signal, Position], SignalCount] = Field(default_factory=dict)
+    environment: list[tuple[Signal, Position, SignalCount]] = Field(default_factory=list)
     n_dimension: int
     new_weight: int = 1
     remove_weight: int = 1
@@ -367,7 +367,7 @@ class EnvironmentMutagen(Mutagen):
                     for numerator, delta in position
                 ),
             ): signal_count
-            for (signal, position), signal_count in self.environment.items()
+            for signal, position, signal_count in self.environment
         }
 
     def mutate(self, num_mutations: int):
@@ -387,44 +387,44 @@ class EnvironmentMutagen(Mutagen):
             if not self.environment or new.value:
                 # add a new random signal preferring small numbers
                 new.bool_value = False
-                self.environment[self.new_key()] = rand_int(1, self.deviation_weight)
+                self.environment.append(self.new_key() + (rand_int(1, self.deviation_weight),))
             elif remove.value:
                 # add a random signal
                 remove.bool_value = False
-                del self.environment[choice(self.environment.keys())]
+                del self.environment[choice(enumerate(self.environment))[0]]
             elif update.value:
                 # update a random signal
                 update.bool_value = False
                 update_mutator.mutate(1)
-                update_key = choice(self.environment.keys())
+                update_idx = choice(enumerate(self.environment))[0]
 
                 if change_signal.value:
                     change_signal.bool_value = False
-                    self.update_change_signal(update_key)
+                    self.update_change_signal(update_idx)
                 elif position.value:
                     position.bool_value = False
-                    self.update_position(update_key)
+                    self.update_position(update_idx)
                 elif add_count.value:
                     add_count.bool_value = False
-                    self.update_add_count(update_key)
+                    self.update_add_count(update_idx)
                 elif sub_count.value:
                     sub_count.bool_value = False
-                    self.update_sub_count(update_key)
+                    self.update_sub_count(update_idx)
 
-    def update_change_signal(self, update_key: tuple[Signal, Position]):
+    def update_change_signal(self, update_idx: int):
         # change to a new signal
-        signal_mutagen = UintMutagen(int_value=update_key[0])
-        signal_mutagen.mutate(1)
+        update_value = self.environment[update_idx]
+        new_signal = self.new_signal()
 
-        if signal_mutagen.value != update_key[0]:
-            new_key = signal_mutagen.value, update_key[1]
-            self.environment[new_key] = self.environment[update_key] + self.environment.get(new_key, 0)
-            del self.environment[update_key]
+        if new_signal != update_value[0]:
+            self.environment.append((new_signal, update_value[1], update_value[2]))
+            del self.environment[update_idx]
 
-    def update_position(self, update_key: tuple[Signal, Position]):
+    def update_position(self, update_idx: int):
         # change the position
+        update_value = self.environment[update_idx]
         dim = choice(range(self.n_dimension))
-        position = update_key[1]
+        position = update_value[1]
         dim_position = position[dim]
 
         if rand_bool():
@@ -447,34 +447,60 @@ class EnvironmentMutagen(Mutagen):
                 for idx, p in enumerate(position)
             )
 
-        new_key = update_key[0], new_position
-        self.environment[new_key] = self.environment[update_key] + self.environment.get(new_key, 0)
-        del self.environment[update_key]
+        existing_idx = None
 
-    def update_add_count(self, update_key: tuple[Signal, Position]):
+        for idx, value in enumerate(self.environment):
+            if value[0] == update_value[0] and value[1] == new_position:
+                existing_idx = idx
+                break
+
+        if existing_idx is not None:
+            self.environment[existing_idx] = (
+                update_value[0],
+                new_position,
+                update_value[2] + self.environment[existing_idx][2]
+            )
+        else:
+            self.environment.append((update_value[0], new_position, update_value[2]))
+
+        del self.environment[update_idx]
+
+    def update_add_count(self, update_idx: int):
         # increase the signal count
-        signal_count = self.environment[update_key]
-        self.environment[update_key] = signal_count + rand_int(1, self.deviation_weight)
+        update_value = self.environment[update_idx]
 
-    def update_sub_count(self, update_key: tuple[Signal, Position]):
+        self.environment[update_idx] = (
+            update_value[0],
+            update_value[1],
+            update_value[2] + rand_int(1, self.deviation_weight),
+        )
+
+    def update_sub_count(self, update_idx: int):
         # decrease the signal count
-        signal_count = self.environment[update_key]
+        update_value = self.environment[update_idx]
         delta = rand_int(1, self.deviation_weight)
 
-        if signal_count > delta:
-            self.environment[update_key] = signal_count - delta
+        if update_value[2] > delta:
+            self.environment[update_idx] = (
+                update_value[0],
+                update_value[1],
+                update_value[2] - delta,
+            )
         else:
-            del self.environment[update_key]
+            del self.environment[update_idx]
 
-    def new_key(self) -> tuple[Signal, Position]:
+    def new_signal(self) -> Signal:
         # We cannot prevent the same key from showing up multiple times so that the signal can show up in multiple
         # places. It is okay if they start in the same spot because they can move independently.
         for new_signal in count():
             if rand_bool():
-                # start in the middle
-                return new_signal, tuple((1, 1) for _ in range(self.n_dimension))
+                return new_signal
 
         raise RuntimeError('unreachable')
+
+    def new_key(self) -> tuple[Signal, Position]:
+        # start in the middle
+        return self.new_signal(), tuple((1, 1) for _ in range(self.n_dimension))
 
 
 class FateMutagen(Mutagen):
@@ -487,6 +513,16 @@ class FateMutagen(Mutagen):
     tetanic_period: OptionalMutagen[TetanicPeriodMutagen] = Field(
         default_factory=lambda: OptionalMutagen[TetanicPeriodMutagen](mutagen=TetanicPeriodMutagen())
     )
+
+    @field_validator('tetanic_period', mode='before')
+    @classmethod
+    def parse_tetanic_period(cls, value: dict) -> OptionalMutagen[TetanicPeriodMutagen]:
+        return OptionalMutagen[TetanicPeriodMutagen](
+            occurrence_weight=value['occurrence_weight'],
+            deviation_weight=value['deviation_weight'],
+            mutagen=TetanicPeriodMutagen(**value['mutagen']),
+            exists=BoolMutagen(**value['exists']),
+        )
 
     @property
     def value(self) -> Fate:
@@ -582,9 +618,9 @@ class IsLeftMutagen(Mutagen):
                     # increase key's threshold
                     add.bool_value = False
                     self.is_left[update_key] += rand_int(1, self.deviation_weight)
-                elif add.value:
+                elif sub.value:
                     # decrease key's threshold
-                    add.bool_value = False
+                    sub.bool_value = False
                     new_threshold = self.is_left[update_key] - rand_int(1, self.deviation_weight)
                     self.is_left[update_key] = max(new_threshold, 0)
 

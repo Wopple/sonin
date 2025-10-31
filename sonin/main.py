@@ -1,15 +1,17 @@
 from datetime import timedelta
 
 from sonin.model.dna import Dna
-from sonin.model.evolution import Echo, PetriDish
+from sonin.model.evolution import Activity, PetriDish
 from sonin.model.fate import BinaryFate, Fate, FateTree
-from sonin.model.hypercube import Vector
+from sonin.model.hypercube import CubeShape, Vector
 from sonin.model.mind import Mind
 from sonin.model.mutation import DnaMutagen
 from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import SignalProfile
 from sonin.model.stimulation import SnapBack, Stimulation
+from sonin.model.storage import load_samples_local, save_samples_local
 from sonin.sonin_random import seed
+
 
 # Rules
 #   Conceptually, neurons and synapses are agents making decisions on their own based on interactions and environment.
@@ -133,111 +135,13 @@ from sonin.sonin_random import seed
 #     - Synapse > Vector
 #     - Facilitation > Gear
 
-def run_and_plot():
+def run_and_plot(sample: DnaMutagen):
     seed(1)
-    dimension_size = 10
-
-    def vec(*coords: int) -> Vector:
-        return Vector(value=tuple(coords), dimension_size=dimension_size)
-
-    fate_1 = Fate(
-        excites=True,
-        axon_signals={
-            1: 1,
-            2: 2,
-        },
-        activation_level=24,
-        refactory_period=0,
-        stimulation=Stimulation(
-            amount=64,
-            snap_back=SnapBack(
-                restore_rate=8,
-                restore_damper=7,
-            ),
-        ),
-        tetanic_period=None,
-    )
-
-    fate_2 = Fate(
-        excites=True,
-        axon_signals={
-            2: 3,
-            3: 5,
-        },
-        activation_level=24,
-        refactory_period=0,
-        stimulation=Stimulation(
-            amount=64,
-            snap_back=SnapBack(
-                restore_rate=8,
-                restore_damper=7,
-            ),
-        ),
-        tetanic_period=None,
-    )
-
-    binary_fate_1 = BinaryFate(
-        left=fate_1,
-        right=fate_2,
-        is_left={
-            (1, True): 20,
-            (2, False): 1,
-        },
-    )
-
-    dna = Dna(
-        n_dimension=2,
-        dimension_size=dimension_size,
-        n_synapse=4,
-        activation_level=24,
-        max_neuron_strength=12,
-        axon_range=2,
-        refactory_period=0,
-        environment=[
-            (1, 100, vec(0, 0)),
-            (1, 200, vec(7, 7)),
-            (2, 100, vec(5, 0)),
-            (2, 300, vec(0, 5)),
-            (3, 200, vec(3, 1)),
-            (3, 300, vec(3, 4)),
-        ],
-        incubation_signals={
-            1: 300,
-            2: 300,
-            3: 300,
-        },
-        signal_profile=SignalProfile(affinities={
-            1: {
-                1: 1,
-                2: -1,
-                3: 3,
-            },
-            2: {
-                1: -3,
-                2: 2,
-                3: 3,
-            },
-            3: {
-                1: -2,
-                2: -2,
-                3: 1,
-            },
-        }),
-        fate_tree=FateTree(root=binary_fate_1),
-    )
+    dna: Dna = sample.value
 
     mind: Mind = dna.build_mind()
+    mind.print_activations = True
     mind.randomize_potential()
-
-    input_neurons = mind.neurons.items[:6]
-    output_neurons = mind.neurons.items[-6:]
-
-    for i, n in enumerate(input_neurons):
-        n.tetanic_period = TetanicPeriod(
-            threshold=2 + i,
-            activations=1 + i,
-            gap=1,
-        )
 
     def plot_synapses():
         import matplotlib.pyplot as plt
@@ -267,18 +171,31 @@ def run_and_plot():
     plot_synapses()
 
 
-def evolve():
+def evolve(samples: list[DnaMutagen], name: str):
     petri_dish = PetriDish(
-        coach=Echo(),
+        samples=[(s, 0) for s in samples],
+        coach=Activity(),
+        sample_retention=4,
+        num_descendants=4,
         num_mutations=64,
+        input_shape=CubeShape(size=2),
+        output_shape=CubeShape(size=2),
+        reward_shape=CubeShape(size=2),
+        punish_shape=CubeShape(size=2),
     )
 
     petri_dish.evolve(
         initial_sample=DnaMutagen(),
-        min_generations=100,
-        min_elapsed_time=timedelta(hours=1),
+        min_generations=50,
+        min_elapsed_time=timedelta(minutes=15),
     )
+
+    save_samples_local(name, [s for s, _ in petri_dish.samples])
 
 
 if __name__ == '__main__':
-    evolve()
+    name = 'progress2'
+    samples = load_samples_local(name)
+    # samples = [DnaMutagen()]
+    # evolve(samples, name)
+    run_and_plot(samples[1])
