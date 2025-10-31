@@ -4,7 +4,7 @@ from sonin.model.facilitation import Facilitation
 
 
 @mark.parametrize(
-    "granularity, limit, modulations, expected_up, expected_down",
+    'granularity, limit, modulations, expected_up, expected_down',
     [
         (1, 0, [], 1, 1),
         (1, 0, [1], 1, 1),
@@ -57,7 +57,7 @@ def test_facilitation_gear(granularity: int, limit: int, modulations: list[int],
 
 
 @mark.parametrize(
-    "granularity, limit, modulations, expected",
+    'granularity, limit, modulations, expected',
     [
         (1, 0, [], 0),
         (1, 0, [1], 0),

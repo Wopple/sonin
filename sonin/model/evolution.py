@@ -5,44 +5,39 @@ from datetime import timedelta
 from pydantic import BaseModel, Field
 
 from sonin.model.dna import Dna
-from sonin.model.growth import Incubator
-from sonin.model.hypercube import CityShape, Hypercube, Vector
+from sonin.model.hypercube import CityShape, Vector
 from sonin.model.mind import Mind, MindInterface
 from sonin.model.mutation import DnaMutagen
-from sonin.model.neuron import Axon, Neuron
 from sonin.model.step import HasStep
-from sonin.sonin_random import Pcg32, Random
+from sonin.sonin_random import rand_int
 
+# 0 is maximum fitness, larger numbers have lower fitness
 type Fitness = int
-
-
-class FitnessCriteria(BaseModel):
-    """
-    Records metrics from a mind for the purpose of producing a final measurement of fitness.
-    """
-
-    mind: MindInterface | None = None
-
-    def record(self, c_time: int):
-        pass
-
-    def measure(self) -> Fitness:
-        raise NotImplementedError(f"{self.__class__.__name__}.measure")
-
-    def reset(self):
-        pass
 
 
 class Coach(BaseModel, HasStep):
     """
-    Interacts with a mind to elicit behavior. Rewards good behavior and punishes bad behavior.
+    Interacts with a mind to elicit behavior.
+    Rewards good behavior and punishes bad behavior.
+    Records metrics for the purpose of producing a final measurement of fitness.
     """
 
     mind: MindInterface | None = None
     done: bool = False
 
     def step(self, c_time: int):
+        self.input(c_time)
         self.mind.step(c_time)
+        self.output(c_time)
+
+    def input(self, c_time: int):
+        pass
+
+    def output(self, c_time: int):
+        pass
+
+    def measure(self) -> Fitness:
+        raise NotImplementedError(f'{self.__class__.__name__}.measure')
 
     def reset(self):
         self.done = False
@@ -52,12 +47,9 @@ class PetriDish(BaseModel):
     """
     Evolves DNA selecting the best fitness.
     """
-    samples: dict[DnaMutagen, Fitness] = Field(min_length=1)
+    samples: list[tuple[DnaMutagen, Fitness]] = Field(default_factory=list)
 
-    # performance heuristic
-    fitness_criteria: FitnessCriteria
-
-    # exercises the mind
+    # exercises the mind while measuring performance
     coach: Coach
 
     # how many samples to keep from each generation
@@ -75,18 +67,21 @@ class PetriDish(BaseModel):
         min_generations: int = 1,
         min_elapsed_time: timedelta = timedelta(seconds=0),
     ):
-        self.samples = {initial_sample: 0}
+        self.samples = []
         num_generations = 0
         start_time = time.time()
 
-        while num_generations < min_generations and (time.time() - start_time) < min_elapsed_time.total_seconds():
+        while num_generations < min_generations or (time.time() - start_time) < min_elapsed_time.total_seconds():
             num_generations += 1
+            descendants = []
 
-            for sample in self.samples.keys():
+            for sample, _ in self.samples or [(initial_sample, None)]:
                 for _ in range(self.num_descendants):
                     # mutate the DNA
                     descendant = sample.model_copy(deep=True)
                     descendant.mutate(self.num_mutations)
+
+                    # build the descendant mind
                     dna: Dna = descendant.value
                     mind: Mind = dna.build_mind()
 
@@ -113,23 +108,84 @@ class PetriDish(BaseModel):
                         ),
                     )
 
-                    # measure fitness
-                    self.fitness_criteria.mind = mind_interface
-                    self.fitness_criteria.reset()
+                    # measure the fitness
                     self.coach.mind = mind_interface
                     self.coach.reset()
                     c_time = 0
 
                     while not self.coach.done:
                         self.coach.step(c_time)
-                        self.fitness_criteria.record(c_time)
                         c_time += 1
 
-                    self.samples[descendant] = self.fitness_criteria.measure()
+                    descendants.append((descendant, self.coach.measure()))
 
             # keep the most fit
-            self.samples = dict(heapq.nlargest(
+            self.samples = heapq.nsmallest(
                 self.sample_retention,
-                self.samples.items(),
+                self.samples + descendants,
                 key=lambda x: x[1],
-            ))
+            )
+
+            print((num_generations, [f for _, f in self.samples]))
+
+
+class Echo(Coach):
+    # expect these values to be echoed back
+    # dict[time, value]
+    expectations: dict[int, int] = Field(default_factory=dict)
+
+    # time of the next input
+    n_time: int = 0
+
+    # time when to switch from training to measuring
+    s_time: int = 250
+
+    # time when done
+    d_time: int = 500
+
+    # expect values to be echoed back in this many steps
+    delay: int = 4
+
+    fitness: Fitness = 0
+
+    def input(self, c_time: int):
+        if c_time >= self.n_time:
+            value = rand_int(1, 15)
+            self.expectations[c_time + self.delay] = value
+            self.mind.input(c_time, value)
+            self.n_time += rand_int(1, 10)
+
+    def output(self, c_time: int):
+        output = self.mind.output()
+
+        if c_time in self.expectations:
+            if output == self.expectations[c_time]:
+                if c_time < self.s_time:
+                    self.mind.reward(c_time, 15)
+            else:
+                if c_time < self.s_time:
+                    self.mind.punish(c_time, abs(output - self.expectations[c_time]))
+                else:
+                    self.fitness += abs(output - self.expectations[c_time])
+
+            del self.expectations[c_time]
+        elif output == 0:
+            if c_time < self.s_time:
+                self.mind.reward(c_time, 3)
+        else:
+            if c_time < self.s_time:
+                self.mind.punish(c_time, output)
+            else:
+                self.fitness += output
+
+        if c_time >= self.d_time:
+            self.done = True
+
+    def measure(self) -> Fitness:
+        return self.fitness
+
+    def reset(self):
+        super().reset()
+        self.expectations = {}
+        self.n_time = 0
+        self.fitness = 0

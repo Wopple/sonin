@@ -25,7 +25,7 @@ def dna(n_dimension: int, dimension_size: int) -> Dna:
 
 
 @mark.parametrize(
-    "a, b, expected",
+    'a, b, expected',
     [
         ((0,), (0,), (0,)),
         ((1,), (0,), (1,)),
@@ -48,7 +48,7 @@ def test_add(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
 
 
 @mark.parametrize(
-    "a, b, expected",
+    'a, b, expected',
     [
         ((0,), (0,), (0,)),
         ((1,), (0,), (1,)),
@@ -69,7 +69,7 @@ def test_sub(a: tuple[int, ...], b: tuple[int, ...], expected: tuple[int, ...]):
 
 
 @mark.parametrize(
-    "a, b, expected",
+    'a, b, expected',
     [
         ((0,), 0, (0,)),
         ((1,), 0, (0,)),
@@ -90,7 +90,7 @@ def test_mul(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
 
 
 @mark.parametrize(
-    "a, b, expected",
+    'a, b, expected',
     [
         ((0,), (0,), 0),
         ((1,), (0,), 0),
@@ -110,7 +110,7 @@ def test_dot_product(a: tuple[int, ...], b: tuple[int, ...], expected: int):
 
 
 @mark.parametrize(
-    "a, b, expected",
+    'a, b, expected',
     [
         ((0,), 1, (0,)),
         ((1,), 1, (1,)),
@@ -133,7 +133,7 @@ def test_div(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
 
 
 @mark.parametrize(
-    "a, b, expected",
+    'a, b, expected',
     [
         ((1,), 0, (0,)),
         ((1,), 1, (1,)),
@@ -156,7 +156,7 @@ def test_rdiv(a: tuple[int, ...], b: int, expected: tuple[int, ...]):
 
 
 @mark.parametrize(
-    "before, expected",
+    'before, expected',
     [
         ((-1,), True),
         ((0,), False),
@@ -182,7 +182,7 @@ def test_out_of_bounds(before: tuple[int, ...], expected: bool):
 
 
 @mark.parametrize(
-    "before, expected",
+    'before, expected',
     [
         ((0,), (0,)),
         ((1,), (1,)),
@@ -218,7 +218,7 @@ def test_city_unit(before: tuple[int, ...], expected: tuple[int, ...]):
 
 
 @mark.parametrize(
-    "center, size, expected",
+    'center, size, expected',
     [
         (Vector.of([0], 10), 1, [(0,)]),
         (Vector.of([0, 0], 10), 1, [(0, 0)]),
@@ -317,7 +317,7 @@ def test_cube_shape(center: Vector, size: int, expected: list[tuple[int, ...]]):
 
 
 @mark.parametrize(
-    "center, size, expected",
+    'center, size, expected',
     [
         (Vector.of([0], 10), 1, [(0,)]),
         (Vector.of([0, 0], 10), 1, [(0, 0)]),

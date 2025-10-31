@@ -24,15 +24,15 @@ from sonin.tree import BinaryTree
 # (1, 1) means: 1 // (1 + 1) or 50%
 # (3, 1) means: 3 // (3 + 1) or 75%
 # (2, 3) means: 2 // (2 + 3) or 40%
-# [(3, 1), (2, 3)] means: 75% along dimension 0 and 40% along dimension 1
+# ((3, 1), (2, 3)) means: 75% along dimension 0 and 40% along dimension 1
 #
 # This allows position encodings to remain consistent across changes in dimension size.
-type Position = list[tuple[int, int]]
+type Position = tuple[tuple[int, int], ...]
 
 
 class Mutable:
     def mutate(self, num_mutations: int):
-        raise NotImplementedError(f"{self.__class__.__name__}.mutate")
+        raise NotImplementedError(f'{self.__class__.__name__}.mutate')
 
 
 class Mutagen(BaseModel, Mutable):
@@ -41,7 +41,7 @@ class Mutagen(BaseModel, Mutable):
 
     @property
     def value(self) -> Any:
-        raise NotImplementedError(f"{self.__class__.__name__}.value")
+        raise NotImplementedError(f'{self.__class__.__name__}.value')
 
 
 class Mutator(BaseModel, Mutable):
@@ -151,7 +151,7 @@ class SignalValueMutagen(Mutagen):
     def model_post_init(self, context: Any, /):
         if self.sub_weight is None:
             # plus 1 to prefer small numbers in the long run
-            self.sub_weight = self.add_weight + self.new_weight + 1
+            self.sub_weight = self.new_weight + self.add_weight + 1
 
     @property
     def value(self) -> dict[Signal, int]:
@@ -192,7 +192,7 @@ class SignalValueMutagen(Mutagen):
             if new_signal not in self.signal_counts and rand_bool():
                 return new_signal
 
-        raise RuntimeError("unreachable")
+        raise RuntimeError('unreachable')
 
 
 class SignalProfileMutagen(Mutagen):
@@ -204,14 +204,18 @@ class SignalProfileMutagen(Mutagen):
     remove_weight: int = None
 
     # value weights
-    signal_new_weight: int | None = None
-    signal_add_weight: int | None = None
-    signal_sub_weight: int | None = None
+    signal_new_weight: int = 1
+    signal_add_weight: int = 3
+    signal_sub_weight: int = None
 
     def model_post_init(self, context: Any, /):
         if self.remove_weight is None:
             # plus 1 to prefer fewer mappings in the long run
             self.remove_weight = self.add_weight + 1
+
+        if self.signal_sub_weight is None:
+            # plus 1 to prefer small numbers in the long run
+            self.signal_sub_weight = self.signal_new_weight + self.signal_add_weight + 1
 
     @property
     def value(self) -> SignalProfile:
@@ -258,7 +262,7 @@ class SignalProfileMutagen(Mutagen):
             if new_signal not in self.affinities and rand_bool():
                 return new_signal
 
-        raise RuntimeError("unreachable")
+        raise RuntimeError('unreachable')
 
 
 class FacilitationMutagen(Mutagen):
@@ -358,10 +362,10 @@ class EnvironmentMutagen(Mutagen):
         return {
             (
                 signal,
-                [
+                tuple(
                     (numerator, numerator + delta)
                     for numerator, delta in position
-                ],
+                ),
             ): signal_count
             for (signal, position), signal_count in self.environment.items()
         }
@@ -413,7 +417,8 @@ class EnvironmentMutagen(Mutagen):
         signal_mutagen.mutate(1)
 
         if signal_mutagen.value != update_key[0]:
-            self[signal_mutagen.value, update_key[1]] = self[update_key]
+            new_key = signal_mutagen.value, update_key[1]
+            self.environment[new_key] = self.environment[update_key] + self.environment.get(new_key, 0)
             del self.environment[update_key]
 
     def update_position(self, update_key: tuple[Signal, Position]):
@@ -426,22 +431,34 @@ class EnvironmentMutagen(Mutagen):
             # mutate the numerator
             mutator = UintMutagen(int_value=dim_position[0])
             mutator.mutate(1)
-            position[dim] = (mutator.value, dim_position[1])
+
+            new_position = tuple(
+                (mutator.value, dim_position[1]) if idx == dim else p
+                for idx, p in enumerate(position)
+            )
         else:
             # mutate the denominator delta
-            # min_value=1 because 0, 0 results in a division by zero, (0, 1) instead divides by 1
+            # min_value=1 because (0, 0) results in a division by zero, (0, 1) instead divides by 1
             mutator = UintMutagen(int_value=dim_position[1], min_value=1)
             mutator.mutate(1)
-            position[dim] = (dim_position[0], mutator.value)
+
+            new_position = tuple(
+                (dim_position[0], mutator.value) if idx == dim else p
+                for idx, p in enumerate(position)
+            )
+
+        new_key = update_key[0], new_position
+        self.environment[new_key] = self.environment[update_key] + self.environment.get(new_key, 0)
+        del self.environment[update_key]
 
     def update_add_count(self, update_key: tuple[Signal, Position]):
         # increase the signal count
-        position, signal_count = self.environment[update_key]
+        signal_count = self.environment[update_key]
         self.environment[update_key] = signal_count + rand_int(1, self.deviation_weight)
 
     def update_sub_count(self, update_key: tuple[Signal, Position]):
         # decrease the signal count
-        position, signal_count = self.environment[update_key]
+        signal_count = self.environment[update_key]
         delta = rand_int(1, self.deviation_weight)
 
         if signal_count > delta:
@@ -455,9 +472,9 @@ class EnvironmentMutagen(Mutagen):
         for new_signal in count():
             if rand_bool():
                 # start in the middle
-                return new_signal, [(1, 1) for _ in range(self.n_dimension)]
+                return new_signal, tuple((1, 1) for _ in range(self.n_dimension))
 
-        raise RuntimeError("unreachable")
+        raise RuntimeError('unreachable')
 
 
 class FateMutagen(Mutagen):
@@ -581,7 +598,7 @@ class IsLeftMutagen(Mutagen):
                 if key not in self.is_left and rand_bool():
                     return key
 
-        raise RuntimeError("unreachable")
+        raise RuntimeError('unreachable')
 
 
 class BinaryFateMutagen(Mutagen):
@@ -611,7 +628,7 @@ class FateTreeMutagen(Mutagen, BinaryTree):
     update_weight: int = 14
 
     # BinaryTree
-    root: FateMutagen | BinaryFateMutagen | None = None
+    root: FateMutagen | BinaryFateMutagen = Field(default_factory=FateMutagen)
 
     is_leaf: Callable[[FateMutagen | BinaryFateMutagen], bool] = Field(
         default=lambda n: isinstance(n, FateMutagen),
@@ -631,14 +648,16 @@ class FateTreeMutagen(Mutagen, BinaryTree):
         for _ in range(num_mutations):
             mutator.mutate(1)
 
-            if self.root is None or new.value:
+            if new.value:
                 # add a new random fate to the tree
                 new.bool_value = False
                 self.add(FateMutagen(), lambda l, r: BinaryFateMutagen(left=l, right=r))
             elif remove.value:
                 # remove a random fate from the tree
                 remove.bool_value = False
-                self.remove()
+
+                if not self.is_leaf(self.root):
+                    self.remove()
             elif update.value:
                 # perform an in-place mutation
                 update.bool_value = False

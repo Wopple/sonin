@@ -55,7 +55,7 @@ def binary_fate(
 
 
 @mark.parametrize(
-    "adds, expected",
+    'adds, expected',
     [
         (
             [([], fate(activation_level=1), [])],
@@ -96,7 +96,7 @@ def test_add(adds: list[tuple[IsLeft, Fate, list[bool]]], expected: Fate | Binar
 
 
 @mark.parametrize(
-    "root, is_next_left, expected",
+    'root, is_next_left, expected',
     [
         (None, [True], None),
         (None, [False], None),
@@ -143,7 +143,7 @@ def test_remove(root: FateNode, is_next_left: list[bool], expected: Fate | Binar
 
 
 @mark.parametrize(
-    "is_left, signals, expected_activation_level",
+    'is_left, signals, expected_activation_level',
     [
         ({(1, True): 0}, {}, 1),
         ({(1, False): 0}, {}, 1),

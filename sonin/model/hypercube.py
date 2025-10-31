@@ -59,16 +59,16 @@ class Vector(BaseModel):
         if isinstance(other, int):
             return Vector.of(tuple(v + other for v in self.value), self.dimension_size)
         elif isinstance(other, tuple | list):
-            assert self.n_dimension == len(other), f"{self.n_dimension} != {len(other)}"
+            assert self.n_dimension == len(other), f'{self.n_dimension} != {len(other)}'
 
             return Vector.of(tuple(s + o for s, o in zip(self.value, other)), self.dimension_size)
         elif isinstance(other, Vector):
-            assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
-            assert self.n_dimension == other.n_dimension, f"{self.n_dimension} != {other.n_dimension}"
+            assert self.dimension_size == other.dimension_size, f'{self.dimension_size} != {other.dimension_size}'
+            assert self.n_dimension == other.n_dimension, f'{self.n_dimension} != {other.n_dimension}'
 
             return Vector.of(tuple(s + o for s, o in zip(self.value, other.value)), self.dimension_size)
         else:
-            raise TypeError(f"Vector.__add__ unexpected type: {other}")
+            raise TypeError(f'Vector.__add__ unexpected type: {other}')
 
     def __radd__(self, other: int) -> Self:
         return self + other
@@ -81,7 +81,7 @@ class Vector(BaseModel):
         elif isinstance(other, Vector):
             return self + -other
         else:
-            raise TypeError(f"Vector.__mul__ unexpected type: {other}")
+            raise TypeError(f'Vector.__mul__ unexpected type: {other}')
 
     def __rsub__(self, other: int) -> Self:
         return -self + other
@@ -90,11 +90,11 @@ class Vector(BaseModel):
         if isinstance(other, int):
             return Vector.of(tuple(v * other for v in self.value), self.dimension_size)
         elif isinstance(other, Vector):
-            assert self.dimension_size == other.dimension_size, f"{self.dimension_size} != {other.dimension_size}"
+            assert self.dimension_size == other.dimension_size, f'{self.dimension_size} != {other.dimension_size}'
 
             return sum(self.value[idx] * other.value[idx] for idx in range(self.n_dimension))
         else:
-            raise TypeError(f"Vector.__mul__ unexpected type: {other}")
+            raise TypeError(f'Vector.__mul__ unexpected type: {other}')
 
     def __rmul__(self, other: int | Self) -> Self:
         return self * other
@@ -111,7 +111,7 @@ class Vector(BaseModel):
         elif isinstance(other, Vector):
             return Vector.of(tuple(div(vs, vo) for vs, vo in zip(self.value, other.value)), self.dimension_size)
         else:
-            raise TypeError(f"Vector.__floordiv__ unexpected type: {other}")
+            raise TypeError(f'Vector.__floordiv__ unexpected type: {other}')
 
     def __rfloordiv__(self, other: int | Self) -> Self:
         if isinstance(other, int):
@@ -119,7 +119,7 @@ class Vector(BaseModel):
         elif isinstance(other, Vector):
             return Vector.of(tuple(div(vo, vs) for vs, vo in zip(self.value, other.value)), self.dimension_size)
         else:
-            raise TypeError(f"Vector.__rfloordiv__ unexpected type: {other}")
+            raise TypeError(f'Vector.__rfloordiv__ unexpected type: {other}')
 
     def out_of_bounds(self) -> bool:
         return any(v < 0 or v >= self.dimension_size for v in self.value)

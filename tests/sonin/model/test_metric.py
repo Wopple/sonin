@@ -4,7 +4,7 @@ from sonin.model.metric import FrequencyProfile
 
 
 @mark.parametrize(
-    "size, c_times, expected",
+    'size, c_times, expected',
     [
         (1, [], -1),
         (1, [1], -1),
@@ -29,7 +29,7 @@ def test_frequency_mean(size: int, c_times: list[int], expected: int):
 
 
 @mark.parametrize(
-    "size, c_times, expected",
+    'size, c_times, expected',
     [
         (1, [], -1),
         (1, [1], -1),

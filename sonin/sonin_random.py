@@ -17,10 +17,10 @@ def rotate_right_32(x: int, num: int) -> int:
 
 class Rng(BaseModel):
     def seed(self, new_seed: int):
-        raise NotImplementedError(f"{self.__class__.__name__}.seed")
+        raise NotImplementedError(f'{self.__class__.__name__}.seed')
 
     def next_u32(self) -> int:
-        raise NotImplementedError(f"{self.__class__.__name__}.next_u32")
+        raise NotImplementedError(f'{self.__class__.__name__}.next_u32')
 
 
 # https://en.wikipedia.org/wiki/Xorshift

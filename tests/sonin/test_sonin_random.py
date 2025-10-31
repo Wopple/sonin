@@ -4,7 +4,7 @@ from sonin.sonin_random import rand_bool, rotate_right_32, seed as set_seed
 
 
 @mark.parametrize(
-    "x, num, expected",
+    'x, num, expected',
     [
         (
             0b00000000000000000000000000000000,
@@ -53,7 +53,7 @@ def test_rotate_right_32(x: int, num: int, expected: int):
 
 
 @mark.parametrize(
-    "seed, expected",
+    'seed, expected',
     [
         (1, True),
         (3, True),

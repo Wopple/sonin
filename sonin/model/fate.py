@@ -19,11 +19,11 @@ type IsLeft = dict[tuple[Signal, IsLower], Threshold]
 
 
 class FateNode(BaseModel):
-    def get_fate(self, signals: dict[Signal, SignalCount]) -> "Fate":
-        raise NotImplementedError("FateNode.get_fate")
+    def get_fate(self, signals: dict[Signal, SignalCount]) -> 'Fate':
+        raise NotImplementedError('FateNode.get_fate')
 
     def size(self) -> int:
-        raise NotImplementedError("FateNode.size")
+        raise NotImplementedError('FateNode.size')
 
 
 class Fate(FateNode):

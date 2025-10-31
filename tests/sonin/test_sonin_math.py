@@ -4,7 +4,7 @@ from sonin.sonin_math import div
 
 
 @mark.parametrize(
-    "a, b, expected",
+    'a, b, expected',
     [
         (3, 2, 1),
         (-3, 2, -1),

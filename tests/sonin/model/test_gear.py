@@ -4,7 +4,7 @@ from sonin.model.gear import Gear
 
 
 @mark.parametrize(
-    "up, down, io",
+    'up, down, io',
     [
         (1, 1, [(1, 1), (2, 2), (3, 3), (4, 4)]),
         (2, 1, [(1, 2), (2, 4), (3, 6), (4, 8)]),
