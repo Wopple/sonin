@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from sonin.model.hypercube import Vector
+from sonin.model.hypercube import Vector, VectorIndex
 from sonin.model.signal import Signal, SignalCount
 from sonin.model.step import HasStep
 from sonin.model.stimulation import Stimulation
@@ -92,10 +92,10 @@ class Neuron(BaseModel, HasStep):
     tetanic_period: TetanicPeriod | None = None
 
     # Synapses connected to post neurons (output)
-    post_synapses: dict[int, Synapse] = Field(default_factory=dict)
+    post_synapses: dict[VectorIndex, Synapse] = Field(default_factory=dict)
 
     # Synapses connected to pre neurons (input)
-    pre_synapses: dict[int, Synapse] = Field(default_factory=dict)
+    pre_synapses: dict[VectorIndex, Synapse] = Field(default_factory=dict)
 
     # Current state of the neuron
     state: int = ACCEPTING
@@ -108,8 +108,8 @@ class Neuron(BaseModel, HasStep):
 
     stimulation: Stimulation
 
-    # Effective range for each signal emitted by this neuron
-    effective_range: dict[Signal, int] = Field(default_factory=dict)
+    # a sliding window of activation in the last 64 steps
+    recent_activations: int = 0
 
     @property
     def inhibits(self) -> bool:
@@ -118,6 +118,7 @@ class Neuron(BaseModel, HasStep):
     def step(self, c_time: int):
         self.stimulation.step()
         self.tetanic_period and self.tetanic_period.step(c_time)
+        self.recent_activations = (self.recent_activations << 1) % 64
 
         # if already activated (e.g. by input), skip
         if self.activated:
@@ -126,7 +127,10 @@ class Neuron(BaseModel, HasStep):
         elif self.state == ACCEPTING:
             is_tetanic = self.tetanic_period and self.tetanic_period.is_active(c_time)
 
-            if self.potential >= self.activation_level or is_tetanic:
+            if self.potential >= self.activation_level:
+                self.activate(c_time)
+                self.recent_activations |= 1
+            elif is_tetanic:
                 self.activate(c_time)
         # re-enable after the refactory period ends
         elif self.state == REFACTORY and c_time >= self.t_refactory_end:

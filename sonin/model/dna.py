@@ -20,6 +20,7 @@ class Dna(BaseModel):
     environment: list[tuple[Signal, SignalCount, Vector]]
     incubation_signals: dict[Signal, SignalCount]
     signal_profile: SignalProfile
+    overstimulation_threshold: int
     fate_tree: FateTree
 
     def build_mind(self) -> Mind:
@@ -69,6 +70,8 @@ class Dna(BaseModel):
             max_neuron_strength=self.max_neuron_strength,
             axon_range=self.axon_range,
             neurons=neurons,
+            signal_profile=self.signal_profile,
+            overstimulation_threshold=self.overstimulation_threshold,
 
             # for reproducible initial state
             random=Random(rng=Pcg32()),

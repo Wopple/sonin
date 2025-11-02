@@ -2,13 +2,9 @@ from datetime import timedelta
 
 from sonin.model.dna import Dna
 from sonin.model.evolution import Activity, PetriDish
-from sonin.model.fate import BinaryFate, Fate, FateTree
-from sonin.model.hypercube import CubeShape, Vector
+from sonin.model.hypercube import CubeShape
 from sonin.model.mind import Mind
 from sonin.model.mutation import DnaMutagen
-from sonin.model.neuron import TetanicPeriod
-from sonin.model.signal import SignalProfile
-from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.model.storage import load_samples_local, save_samples_local
 from sonin.sonin_random import seed
 
@@ -19,12 +15,12 @@ from sonin.sonin_random import seed
 #   Floats are 100% banned for performance critical code, even for intermediate values. This is to avoid floating
 #   point imprecision, and so specialized hardware does not require any circuitry for performing floating point math.
 #   Everything should use ints. I also do not see a need for strings, but strictly speaking they are not banned.
-#   Floats can only and strings should only exist outside the mind's interface.
 
 # Reading
 #   https://nba.uth.tmc.edu/neuroscience/m/s1/index.htm
 #   https://pmc.ncbi.nlm.nih.gov/articles/PMC8186004/
 #   https://pmc.ncbi.nlm.nih.gov/articles/PMC4743082/
+#   https://pmc.ncbi.nlm.nih.gov/articles/PMC9513053/
 #   https://biology.kenyon.edu/courses/biol114/Chap11/Chapter_11.html
 #   https://www.science.org/doi/10.1126/science.aax6239
 
@@ -34,15 +30,14 @@ from sonin.sonin_random import seed
 #   + Synapses are entities as well.
 #   + Synapses are bidirectional.
 #   + Synapses can strengthen and weaken.
-#   + Neurons can regulate excitation when overstimulated by weakening connections.
+#   - There are electrical synapses that allow a group of neurons to be activated simultaneously.
+#   + There are chemical synapses that have a delay in the transmission of signals.
 #   + Longer duration stimuli can lead to the initiation of multiple action potentials. The frequency is dependent on
 #       the intensity of the stimulus.
 # 
 #   - Simple circuits can create behavior like lateral inhibition creating edge enhancement.
 #   + Some neurons periodically activate in bursts even without excitation.
 #
-#   + Neurons that fire together, wire together.
-#   - Connected neurons that fail to activate together weaken their connection over time.
 #   - Not all synapses exhibit this behavior.
 #
 #   + There are absolute and partial refactory periods. We may or may not need them though because one if their purposes
@@ -57,6 +52,25 @@ from sonin.sonin_random import seed
 #   - There is a short delay between action potential and the communication to connected neurons. There are gap junction
 #       synapses with minimal delay. We may not need to simulate this.
 #
+#   - Neuroplasticity
+#     - Synaptic plasticity depends on the post-synaptic neuron.
+#       - Connected neurons that fail to activate together weaken their connection over time.
+#     + Neurons that fire together, wire together (short timescale).
+#     - Neurons self regulate to maintain homeostasis (medium timescale).
+#       + Neurons can regulate excitation when overstimulated by weakening connections.
+#       - Neurons can regulate excitation when understimulated by strengthening connections.
+#     - Some neurons can flip between excitatory and inhibitory due to chronic activation (long timescale). 
+#     - Synaptogenesis
+#       - Depends upon local state.
+#       - Synapses are influenced by neural activities.
+#       - Activation (e.g. tetanic) increases the likelihood of forming input synapses.
+#       - Synapses are formed enthusiastically at the beginning.
+#         - Learning involves synaptic pruning to operate efficiently.
+#       - Synaptic Adhesion Molecules (SAMs) promote or inhibit both the formation of synaptic connections and their
+#         strength.
+#       - Pre-synaptic SAMs are more general and post-synaptic SAMs are more specific.
+#       - SAMs probably affect the synaptic properties.
+#
 #   - Intrinsic synaptic plasticities include:
 #     - synaptic depression
 #     - synaptic facilitation
@@ -69,22 +83,18 @@ from sonin.sonin_random import seed
 #
 #   - Synapses can be connected to other synapses to regulate their activity. They can be excitatory or inhibitory
 #       creating lasting changes.
-#   - Synaptic plasticity depends on the post-synaptic neuron.
 #
 #   - Neurons also communicate environmentally by diffusing neurotransmitters.
 #
 #   - Synapses are mostly formed over a short period of time and are mostly pruned slowly over a longer period of time.
 #       Interaction with the world happens during both periods.
 #
-#   - Even in mature minds, synaptic turnover is high estimated at 40% per week but varies a lot depending on the region.
+#   - Even in mature minds, synaptic turnover is high estimated at 40% per week but varies a lot depending on the
+#     region.
 #   - The axon and dendrites tend to remain stable.
 #
 #   - Neurons mostly use the same neurotransmitter, but some can use multiple or switch. Synapses still only get one.
 #   - Synapses will only form such that the neurotransmitter will be received. This could simply be implemented by enum. 
-#
-#   - Synaptic Adhesion Molecules (SAMs) promote or inhibit both the formation of synaptic connections and their strength.
-#   - Pre-synaptic SAMs are more general and post-synaptic SAMs are more specific.
-#   - SAMs probably affect the synaptic properties.
 #
 #   - It is not known if synaptic formation is based on priority or shaped by making eager connections and dropping the
 #       ones that are performing poorly.
@@ -119,6 +129,20 @@ from sonin.sonin_random import seed
 # Tests
 #   - Weighted suite of tests
 #   - Monkey test: resilient in the presence of change
+#   - Priority:
+#     1. Health
+#       - activity within an appropriate range
+#       - neuroplastic properties
+#       - comprehensive connectivity
+#       - differentiation
+#       - age appropriate behavior
+#         - young: enthusiastically form connections
+#         - adult: optimize through pruning
+#         - elderly: degradation to prevent runaway
+#     2. Optimization
+#       - task specialization
+#     3. Globalization
+#       - intermodule connections
 
 # Model
 #   - Dependency Graph
@@ -136,7 +160,6 @@ from sonin.sonin_random import seed
 #     - Facilitation > Gear
 
 def run_and_plot(sample: DnaMutagen):
-    seed(1)
     dna: Dna = sample.value
 
     mind: Mind = dna.build_mind()
@@ -177,7 +200,7 @@ def evolve(samples: list[DnaMutagen], name: str):
         coach=Activity(),
         sample_retention=4,
         num_descendants=4,
-        num_mutations=64,
+        num_mutations=256,
         input_shape=CubeShape(size=2),
         output_shape=CubeShape(size=2),
         reward_shape=CubeShape(size=2),
@@ -194,6 +217,7 @@ def evolve(samples: list[DnaMutagen], name: str):
 
 
 if __name__ == '__main__':
+    seed(1)
     name = 'progress2'
     samples = load_samples_local(name)
     # samples = [DnaMutagen()]

@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 
 from sonin.sonin_math import div
 
+type VectorIndex = int
+
 
 class Vector(BaseModel):
     # Virtual path of indices to a neuron in the hypercube
@@ -14,7 +16,7 @@ class Vector(BaseModel):
 
     # Index of the position in the single dimensional representation of the hypercube
     # Requires dimension_size to calculate
-    index: int | None = None
+    index: VectorIndex | None = None
 
     @classmethod
     def of(cls, value: tuple[int, ...] | list[int], dimension_size: int | None = None):

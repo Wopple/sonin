@@ -27,6 +27,7 @@ def dna(n_dimension: int) -> Dna:
         environment=[],
         incubation_signals={},
         signal_profile=SignalProfile(affinities={}),
+        overstimulation_threshold=1,
         fate_tree=FateTree(),
     )
 

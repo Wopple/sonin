@@ -711,6 +711,12 @@ class DnaMutagen(Mutagen):
     environment_mutagen: EnvironmentMutagen = None
     incubation_signals_mutagen: SignalValueMutagen = Field(default_factory=SignalValueMutagen)
     signal_profile_mutagen: SignalProfileMutagen = Field(default_factory=SignalProfileMutagen)
+
+    overstimulation_threshold_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(
+        int_value=100,
+        min_value=1,
+    ))
+
     fate_tree_mutagen: FateTreeMutagen = Field(default_factory=FateTreeMutagen)
 
     def model_post_init(self, context: Any, /):
@@ -744,6 +750,7 @@ class DnaMutagen(Mutagen):
             environment=environment,
             incubation_signals=self.incubation_signals_mutagen.value,
             signal_profile=self.signal_profile_mutagen.value,
+            overstimulation_threshold=self.overstimulation_threshold_mutagen.value,
             fate_tree=self.fate_tree_mutagen.value,
         )
 
