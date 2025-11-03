@@ -2,10 +2,11 @@ from pydantic import BaseModel
 
 from sonin.model.fate import FateTree
 from sonin.model.growth import Incubator
-from sonin.model.hypercube import Hypercube, Vector
-from sonin.model.mind import Mind
+from sonin.model.hypercube import CubeShape, Hypercube, Shape, Vector
+from sonin.model.mind import Mind, MindInterface
 from sonin.model.neuron import Axon, Neuron
 from sonin.model.signal import Signal, SignalCount, SignalProfile
+from sonin.sonin_math import div
 from sonin.sonin_random import Pcg32, Random
 
 
@@ -22,8 +23,12 @@ class Dna(BaseModel):
     signal_profile: SignalProfile
     overstimulation_threshold: int
     fate_tree: FateTree
+    input_shape: Shape = CubeShape(size=2)
+    output_shape: Shape = CubeShape(size=2)
+    reward_shape: Shape | None = None
+    punish_shape: Shape | None = None
 
-    def build_mind(self) -> Mind:
+    def build_mind(self, random: Random | None = None) -> MindInterface:
         # perform cell division
         incubator = Incubator(
             n_dimension=self.n_dimension,
@@ -72,11 +77,47 @@ class Dna(BaseModel):
             neurons=neurons,
             signal_profile=self.signal_profile,
             overstimulation_threshold=self.overstimulation_threshold,
+            random=random or Random(rng=Pcg32()),
+        )
 
-            # for reproducible initial state
-            random=Random(rng=Pcg32()),
+        last_idx = self.dimension_size - 1
+        lower_half_dimension = div(self.n_dimension, 2)
+        upper_half_dimension = self.n_dimension - lower_half_dimension
+
+        input_shape = self.input_shape.model_copy(update={'center': Vector.of(
+            (0,) * self.n_dimension,
+            self.dimension_size,
+        )})
+
+        output_shape = self.output_shape.model_copy(update={'center': Vector.of(
+            (last_idx,) * lower_half_dimension + (0,) * upper_half_dimension,
+            self.dimension_size,
+        )})
+
+        if self.reward_shape:
+            reward_shape = self.reward_shape.model_copy(update={'center': Vector.of(
+                (0,) * lower_half_dimension + (last_idx,) * upper_half_dimension,
+                self.dimension_size,
+            )})
+        else:
+            reward_shape = None
+
+        if self.punish_shape:
+            punish_shape = self.punish_shape.model_copy(update={'center': Vector.of(
+                (last_idx,) * self.n_dimension,
+                self.dimension_size,
+            )})
+        else:
+            punish_shape = None
+
+        mind_interface = MindInterface(
+            mind=mind,
+            input_shape=input_shape,
+            output_shape=output_shape,
+            reward_shape=reward_shape,
+            punish_shape=punish_shape,
         )
 
         mind.guide_axons()
         mind.randomize_synapses()
-        return mind
+        return mind_interface

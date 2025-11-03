@@ -1,20 +1,11 @@
 from datetime import timedelta
 
 from sonin.model.dna import Dna
-from sonin.model.evolution import Activity, PetriDish
-from sonin.model.hypercube import CubeShape
-from sonin.model.mind import Mind
+from sonin.model.evolution import Health, PetriDish
+from sonin.model.mind import Mind, MindInterface
 from sonin.model.mutation import DnaMutagen
 from sonin.model.storage import load_samples_local, save_samples_local
 from sonin.sonin_random import seed
-
-
-# Rules
-#   Conceptually, neurons and synapses are agents making decisions on their own based on interactions and environment.
-#   The mind is the programmatic engine that facilitates that behavior.
-#   Floats are 100% banned for performance critical code, even for intermediate values. This is to avoid floating
-#   point imprecision, and so specialized hardware does not require any circuitry for performing floating point math.
-#   Everything should use ints. I also do not see a need for strings, but strictly speaking they are not banned.
 
 # Reading
 #   https://nba.uth.tmc.edu/neuroscience/m/s1/index.htm
@@ -162,7 +153,8 @@ from sonin.sonin_random import seed
 def run_and_plot(sample: DnaMutagen):
     dna: Dna = sample.value
 
-    mind: Mind = dna.build_mind()
+    mind_interface: MindInterface = dna.build_mind()
+    mind: Mind = mind_interface.mind
     mind.print_activations = True
     mind.randomize_potential()
 
@@ -188,29 +180,29 @@ def run_and_plot(sample: DnaMutagen):
         ax.set_title('Synapses')
         plt.show()
 
-    for i in range(100):
+    for i in range(32):
         mind.step(i)
 
     plot_synapses()
 
 
-def evolve(samples: list[DnaMutagen], name: str):
+def evolve(
+    samples: list[DnaMutagen],
+    name: str,
+    min_generations: int,
+    min_elapsed_time: timedelta,
+):
     petri_dish = PetriDish(
-        samples=[(s, 0) for s in samples],
-        coach=Activity(),
+        coach=Health(),
         sample_retention=4,
         num_descendants=4,
         num_mutations=256,
-        input_shape=CubeShape(size=2),
-        output_shape=CubeShape(size=2),
-        reward_shape=CubeShape(size=2),
-        punish_shape=CubeShape(size=2),
     )
 
     petri_dish.evolve(
-        initial_sample=DnaMutagen(),
-        min_generations=50,
-        min_elapsed_time=timedelta(minutes=15),
+        initial_samples=samples,
+        min_generations=min_generations,
+        min_elapsed_time=min_elapsed_time,
     )
 
     save_samples_local(name, [s for s, _ in petri_dish.samples])
@@ -218,8 +210,8 @@ def evolve(samples: list[DnaMutagen], name: str):
 
 if __name__ == '__main__':
     seed(1)
-    name = 'progress2'
+    name = 'progress1'
     samples = load_samples_local(name)
     # samples = [DnaMutagen()]
-    # evolve(samples, name)
-    run_and_plot(samples[1])
+    evolve(samples, name, 10, timedelta(minutes=0))
+    # run_and_plot(samples[0])

@@ -207,7 +207,7 @@ class Mind(BaseModel, HasStep):
 
             if (not previous_activated) and n.activated:
                 self.num_activations += 1
-                self.activation_set[-1] |= 1 << idx
+                self.activation_set[-1] |= 1 << (idx % 64)
 
             # prevent overstimulation
             if n.stimulation and n.stimulation.value > self.overstimulation_threshold and len(n.pre_synapses) > 0:

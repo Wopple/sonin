@@ -1,11 +1,11 @@
 from itertools import count
 from typing import Any, Callable, ClassVar, Self
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from sonin.model.dna import Dna
 from sonin.model.facilitation import Facilitation
-from sonin.model.fate import BinaryFate, Fate, FateTree, IsLeft, IsLower
+from sonin.model.fate import BinaryFate, Fate, FateTree, IsLeft, IsLower, Threshold
 from sonin.model.hypercube import Vector
 from sonin.model.neuron import TetanicPeriod
 from sonin.model.signal import Signal, SignalCount, SignalProfile
@@ -117,29 +117,6 @@ class IntMutagen(Mutagen):
 class UintMutagen(IntMutagen):
     MIN: ClassVar[int] = 0
     MAX: ClassVar[int] = 2 ** 64 - 1
-
-
-class OptionalMutagen[T](Mutagen):
-    mutagen: Mutagen
-    exists: BoolMutagen = Field(default_factory=BoolMutagen)
-
-    @property
-    def value(self) -> T | None:
-        if self.exists.value:
-            return self.mutagen.value
-        else:
-            return None
-
-    def mutate(self, num_mutations: int):
-        if self.exists.value:
-            # if it exists, randomly choose the mutagen to mutate
-            Mutator(mutagens=[
-                self.mutagen,
-                self.exists,
-            ]).mutate(num_mutations)
-        else:
-            # if it does not exist, bring it into existence
-            self.exists.mutate(1)
 
 
 class SignalValueMutagen(Mutagen):
@@ -503,26 +480,31 @@ class EnvironmentMutagen(Mutagen):
         return self.new_signal(), tuple((1, 1) for _ in range(self.n_dimension))
 
 
+KIND_FATE = 0
+KIND_BINARY_FATE = 1
+
+
+def parse_fate_node(node: Any) -> BaseModel:
+    if isinstance(node, BaseModel):
+        return node
+    elif isinstance(node, dict):
+        if node['kind'] == KIND_FATE:
+            return FateMutagen(**node)
+        elif node['kind'] == KIND_BINARY_FATE:
+            return BinaryFateMutagen(**node)
+
+    raise ValueError(f'Unable to parse: {node}')
+
+
 class FateMutagen(Mutagen):
+    kind: int = KIND_FATE
     excites: BoolMutagen = Field(default_factory=BoolMutagen)
     axon_signals: SignalValueMutagen = Field(default_factory=SignalValueMutagen)
     activation_level: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
     refactory_period: UintMutagen = Field(default_factory=UintMutagen)
     stimulation: StimulationMutagen = Field(default_factory=StimulationMutagen)
-
-    tetanic_period: OptionalMutagen[TetanicPeriodMutagen] = Field(
-        default_factory=lambda: OptionalMutagen[TetanicPeriodMutagen](mutagen=TetanicPeriodMutagen())
-    )
-
-    @field_validator('tetanic_period', mode='before')
-    @classmethod
-    def parse_tetanic_period(cls, value: dict) -> OptionalMutagen[TetanicPeriodMutagen]:
-        return OptionalMutagen[TetanicPeriodMutagen](
-            occurrence_weight=value['occurrence_weight'],
-            deviation_weight=value['deviation_weight'],
-            mutagen=TetanicPeriodMutagen(**value['mutagen']),
-            exists=BoolMutagen(**value['exists']),
-        )
+    has_tetanic_period: BoolMutagen = Field(default_factory=BoolMutagen)
+    tetanic_period: TetanicPeriodMutagen = Field(default_factory=TetanicPeriodMutagen)
 
     @property
     def value(self) -> Fate:
@@ -532,7 +514,7 @@ class FateMutagen(Mutagen):
             activation_level=self.activation_level.value,
             refactory_period=self.refactory_period.value,
             stimulation=self.stimulation.value,
-            tetanic_period=self.tetanic_period.value,
+            tetanic_period=self.tetanic_period.value if self.has_tetanic_period.value else None,
         )
 
     def mutate(self, num_mutations: int):
@@ -542,12 +524,13 @@ class FateMutagen(Mutagen):
             self.activation_level,
             self.refactory_period,
             self.stimulation,
+            self.has_tetanic_period,
             self.tetanic_period,
         ]).mutate(num_mutations)
 
 
 class IsLeftMutagen(Mutagen):
-    is_left: IsLeft = Field(default_factory=dict)
+    is_left: list[tuple[Signal, IsLower, Threshold]] = Field(default_factory=list)
     new_weight: int = 1
     remove_weight: int = None
     update_weight: int = 5
@@ -563,7 +546,7 @@ class IsLeftMutagen(Mutagen):
 
     @property
     def value(self) -> IsLeft:
-        return self.is_left.copy()
+        return {(signal, is_lower): threshold for signal, is_lower, threshold in self.is_left}
 
     def mutate(self, num_mutations: int):
         # these mutagens pick which action to perform per mutation
@@ -583,64 +566,87 @@ class IsLeftMutagen(Mutagen):
             if not self.is_left or new.value:
                 # add a random new key preferring small numbers
                 new.bool_value = False
-                self.is_left[self.new_key()] = rand_int(1, self.deviation_weight)
+                self.is_left.append(self.new_key() + (rand_int(1, self.deviation_weight),))
             elif remove.value:
                 # remove a random existing key
                 remove.bool_value = False
-                del self.is_left[choice(self.is_left.keys())]
+                del self.is_left[rand_int(0, len(self.is_left) - 1)]
             elif update.value:
                 # update a random existing key
                 update.bool_value = False
                 update_mutator.mutate(1)
-                update_key = choice(self.is_left.keys())
+                update_idx = rand_int(0, len(self.is_left) - 1)
 
                 if change_signal.value:
                     # change the value the key's signal preferring small numbers
                     change_signal.bool_value = False
 
-                    self.is_left[self.new_key([update_key[1]])] = self.is_left[update_key]
-                    del self.is_left[update_key]
+                    new_key = self.new_key([self.is_left[update_idx][1]])
+                    self.is_left.append(new_key + (self.is_left[update_idx][2],))
+                    del self.is_left[update_idx]
                 elif is_lower.value:
                     # invert the key's IsLower, also invert the new key's IsLower if it already exists
                     is_lower.bool_value = False
-                    new_key = update_key[0], not update_key[1]
+                    new_key = self.is_left[update_idx][0], not self.is_left[update_idx][1]
+                    new_idx = self.index_of(new_key)
 
-                    if new_key in self.is_left:
+                    if new_idx is not None:
                         # swap
-                        temp = self.is_left[new_key]
-                        self.is_left[new_key] = self.is_left[update_key]
-                        self.is_left[update_key] = temp
+                        temp = self.is_left[new_idx][2]
+                        self.is_left[new_idx] = self.is_left[update_idx]
+                        self.is_left[update_idx] = self.is_left[update_idx][0], self.is_left[update_idx][1], temp
                     else:
                         # move
-                        self.is_left[new_key] = self.is_left[update_key]
-                        del self.is_left[update_key]
+                        self.is_left[update_idx] = new_key + (self.is_left[update_idx][2],)
                 elif add.value:
                     # increase key's threshold
                     add.bool_value = False
-                    self.is_left[update_key] += rand_int(1, self.deviation_weight)
+                    new_value = self.is_left[update_idx][2] + rand_int(1, self.deviation_weight)
+                    self.is_left[update_idx] = self.is_left[update_idx][0], self.is_left[update_idx][1], new_value
                 elif sub.value:
                     # decrease key's threshold
                     sub.bool_value = False
-                    new_threshold = self.is_left[update_key] - rand_int(1, self.deviation_weight)
-                    self.is_left[update_key] = max(new_threshold, 0)
+                    new_threshold = self.is_left[update_idx][2] - rand_int(1, self.deviation_weight)
+                    new_value = max(new_threshold, 0)
+                    self.is_left[update_idx] = self.is_left[update_idx][0], self.is_left[update_idx][1], new_value
+
+    def index_of(self, key: tuple[Signal, IsLower]) -> int | None:
+        for idx, item in enumerate(self.is_left):
+            if item[:2] == key:
+                return idx
+
+        return None
 
     def new_key(self, is_lowers: list[IsLower] | None = None) -> tuple[Signal, IsLower]:
         is_lowers = is_lowers or [False, True]
+        keys = {item[:2] for item in self.is_left}
 
         for new_signal in count():
             for new_is_lower in is_lowers:
                 key = new_signal, new_is_lower
 
-                if key not in self.is_left and rand_bool():
+                if key not in keys and rand_bool():
                     return key
 
         raise RuntimeError('unreachable')
 
 
 class BinaryFateMutagen(Mutagen):
+    kind: int = KIND_BINARY_FATE
     left: FateMutagen | Self
     right: FateMutagen | Self
     is_left: IsLeftMutagen = Field(default_factory=IsLeftMutagen)
+
+    @field_validator('left', 'right', mode='before')
+    @classmethod
+    def validate_fate_node(cls, node: dict[str, Any]) -> Any:
+        return parse_fate_node(node)
+
+    @field_serializer('left', 'right')
+    @classmethod
+    def serialize_fate_node(cls, node: BaseModel) -> str | dict[str, Any]:
+        # necessary to call the specific serializer
+        return node.model_dump()
 
     @property
     def value(self) -> BinaryFate:
@@ -670,6 +676,17 @@ class FateTreeMutagen(Mutagen, BinaryTree):
         default=lambda n: isinstance(n, FateMutagen),
         exclude=True,
     )
+
+    @field_validator('root', mode='before')
+    @classmethod
+    def validate_fate_node(cls, node: dict[str, Any]) -> Any:
+        return parse_fate_node(node)
+
+    @field_serializer('root')
+    @classmethod
+    def serialize_fate_node(cls, node: BaseModel) -> str | dict[str, Any]:
+        # necessary to call the specific serializer
+        return node.model_dump()
 
     @property
     def value(self) -> FateTree:

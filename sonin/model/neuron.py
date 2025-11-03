@@ -127,11 +127,9 @@ class Neuron(BaseModel, HasStep):
         elif self.state == ACCEPTING:
             is_tetanic = self.tetanic_period and self.tetanic_period.is_active(c_time)
 
-            if self.potential >= self.activation_level:
+            if self.potential >= self.activation_level or is_tetanic:
                 self.activate(c_time)
                 self.recent_activations |= 1
-            elif is_tetanic:
-                self.activate(c_time)
         # re-enable after the refactory period ends
         elif self.state == REFACTORY and c_time >= self.t_refactory_end:
             self.enable()
