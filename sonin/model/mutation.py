@@ -123,7 +123,7 @@ class SignalValueMutagen(Mutagen):
     signal_counts: dict[Signal, int] = Field(default_factory=dict)
     new_weight: int = 1
     add_weight: int = 3
-    sub_weight: int = None
+    sub_weight: int = 4
 
     def model_post_init(self, context: Any, /):
         if self.sub_weight is None:
@@ -178,12 +178,12 @@ class SignalProfileMutagen(Mutagen):
     # affinity weights
     add_weight: int = 1
     update_weight: int = 3
-    remove_weight: int = None
+    remove_weight: int = 1
 
     # value weights
     signal_new_weight: int = 1
     signal_add_weight: int = 3
-    signal_sub_weight: int = None
+    signal_sub_weight: int = 1
 
     def model_post_init(self, context: Any, /):
         if self.remove_weight is None:
@@ -532,7 +532,7 @@ class FateMutagen(Mutagen):
 class IsLeftMutagen(Mutagen):
     is_left: list[tuple[Signal, IsLower, Threshold]] = Field(default_factory=list)
     new_weight: int = 1
-    remove_weight: int = None
+    remove_weight: int = 1
     update_weight: int = 5
     change_signal_weight: int = 1
     is_lower_weight: int = 1
@@ -723,7 +723,7 @@ class DnaMutagen(Mutagen):
     n_synapse_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1, max_value=10))
     activation_level_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
     max_neuron_strength_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1))
-    axon_range_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1, max_value=10))
+    axon_range_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(int_value=1, min_value=1, max_value=3))
     refactory_period_mutagen: UintMutagen = Field(default_factory=lambda: UintMutagen(max_value=5))
     environment_mutagen: EnvironmentMutagen = None
     incubation_signals_mutagen: SignalValueMutagen = Field(default_factory=SignalValueMutagen)
@@ -779,6 +779,8 @@ class DnaMutagen(Mutagen):
             self.axon_range_mutagen,
             self.refactory_period_mutagen,
             self.environment_mutagen,
+            self.incubation_signals_mutagen,
             self.signal_profile_mutagen,
+            self.overstimulation_threshold_mutagen,
             self.fate_tree_mutagen,
         ]).mutate(num_mutations)

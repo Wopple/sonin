@@ -154,7 +154,7 @@ class Mind(BaseModel, HasStep):
                 attraction = Vector.of((0,) * self.n_dimension, self.dimension_size)
 
                 # Sum the attractive effects between the signals
-                for guide_signal, guide_signal_count, guide_position, effective_range in all_signals:
+                for guide_signal, guide_signal_count, guide_position in all_signals:
                     distance = guide_position.city_distance(axon_position)
 
                     # skip signals that are out of range

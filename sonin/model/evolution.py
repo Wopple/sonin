@@ -11,7 +11,8 @@ from sonin.model.step import HasStep
 from sonin.sonin_math import div
 from sonin.sonin_random import Pcg32, Random
 
-# 0 is maximum fitness, larger numbers have lower fitness
+# 1 is maximum fitness, larger numbers have lower fitness. 1 is used instead of zero because multiplying by zero
+# eliminates all the other fitness criteria.
 type Fitness = int
 
 
@@ -73,6 +74,8 @@ class PetriDish(BaseModel):
         start_time = time.time()
 
         while num_generations < min_generations or (time.time() - start_time) < min_elapsed_time.total_seconds():
+            new_samples: list[tuple[DnaMutagen, Fitness]] = []
+
             if initial_samples:
                 descendants = initial_samples
                 initial_samples = None
@@ -101,12 +104,13 @@ class PetriDish(BaseModel):
                     self.coach.step(c_time)
                     c_time += 1
 
-                self.samples.append((descendant, self.coach.measure()))
+                new_samples.append((descendant, self.coach.measure()))
 
             # keep the most fit
+            # prepending new samples allows for drift on ties due to stable sort
             self.samples = heapq.nsmallest(
                 self.sample_retention,
-                self.samples,
+                new_samples + self.samples,
                 key=lambda x: x[1],
             )
 
@@ -155,9 +159,20 @@ class Health(Coach):
             self.done = True
 
     def measure(self) -> Fitness:
-        # target_activations_component = self.target_activations_miss + 1
+        target_activations_component = div(self.target_activations_miss, self.d_time) + 1
+
+        target_axon_distance_component = div(sum(
+            abs(self.mind.mind.dimension_size - n.position.city_distance(n.axon.position))
+            for n in self.mind.mind.neurons
+        ), len(self.mind.mind.neurons.items)) + 1
+
         activations_set_component = max(self.activations_set_counts.values())
-        return activations_set_component
+
+        return (
+            target_activations_component
+            * target_axon_distance_component
+            * activations_set_component
+        )
 
     def reset(self):
         super().reset()

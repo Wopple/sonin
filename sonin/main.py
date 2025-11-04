@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import matplotlib.pyplot as plot
+
 from sonin.model.dna import Dna
 from sonin.model.evolution import Health, PetriDish
 from sonin.model.mind import Mind, MindInterface
@@ -134,21 +136,9 @@ from sonin.sonin_random import seed
 #       - task specialization
 #     3. Globalization
 #       - intermodule connections
+#     4. Competition
+#       - minds compete with each other
 
-# Model
-#   - Dependency Graph
-#     - PetriDish > Mutagen
-#     - PetriDish > MindInterface
-#     - MindInterface > Mind
-#     - Mutagen > Mutable Models
-#     - Incubator > Hypercube
-#     - Mind > Hypercube
-#     - Mind > Neuron
-#     - Mind > Vector
-#     - Mind > Synapse
-#     - Neuron > Synapse
-#     - Synapse > Vector
-#     - Facilitation > Gear
 
 def run_and_plot(sample: DnaMutagen):
     dna: Dna = sample.value
@@ -159,15 +149,13 @@ def run_and_plot(sample: DnaMutagen):
     mind.randomize_potential()
 
     def plot_synapses():
-        import matplotlib.pyplot as plt
-
         line_segments = [
             (s.pre_neuron.value, s.post_neuron.value)
             for n in mind.neurons.items
             for s in n.post_synapses.values()
         ]
 
-        fig, ax = plt.subplots()
+        fig, ax = plot.subplots()
 
         for segment in line_segments:
             (x1, y1), (x2, y2) = segment
@@ -178,12 +166,32 @@ def run_and_plot(sample: DnaMutagen):
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.set_title('Synapses')
-        plt.show()
+        plot.show()
+
+    def plot_axons():
+        line_segments = [
+            (n.position.value, n.axon.position.value)
+            for n in mind.neurons.items
+        ]
+
+        fig, ax = plot.subplots()
+
+        for segment in line_segments:
+            (x1, y1), (x2, y2) = segment
+            ax.plot([x1, x2], [y1, y2], marker='o')
+
+        ax.set_aspect('equal')
+        ax.grid(True)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_title('Axons')
+        plot.show()
 
     for i in range(32):
         mind.step(i)
 
-    plot_synapses()
+    # plot_synapses()
+    plot_axons()
 
 
 def evolve(
