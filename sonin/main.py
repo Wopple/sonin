@@ -77,6 +77,7 @@ from sonin.sonin_random import seed
 #       creating lasting changes.
 #
 #   - Neurons also communicate environmentally by diffusing neurotransmitters.
+#   - A small percentage of neurons fire with very high variation
 #
 #   - Synapses are mostly formed over a short period of time and are mostly pruned slowly over a longer period of time.
 #       Interaction with the world happens during both periods.

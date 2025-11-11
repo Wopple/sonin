@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from sonin.model.dna import Dna
 from sonin.model.mind import MindInterface
-from sonin.model.mutation2 import Mutator
+from sonin.model.mutation import Mutator
 from sonin.model.step import HasStep
 from sonin.sonin_math import div
 from sonin.sonin_random import HasRandom
@@ -52,9 +52,7 @@ class Health(Coach):
         self,
         mind: MindInterface | None = None,
         n_time: int = 0,
-        d_time: int = 32,
-        target_activations_miss: int = 0,
-        activations_set_counts: dict[tuple[int, ...], int] | None = None,
+        d_time: int = 64,
     ):
         Coach.__init__(self, mind=mind)
 
@@ -64,10 +62,12 @@ class Health(Coach):
         # time when done
         self.d_time = d_time
 
-        self.target_activations_miss = target_activations_miss
+        self.target_activations_miss: int = 0
+        self.differentiation_miss: int = 0
 
         # used to incentivise variation in the activations otherwise we get simple oscillation
-        self.activations_set_counts = activations_set_counts or {}
+        self.activations_set_counts: dict[tuple[int, ...], int] = {}
+        self.previous_activations_set: tuple[int, ...] | None = None
 
     def post_step(self, c_time: int):
         # target partial activity to avoid too much and too little activity
@@ -82,12 +82,21 @@ class Health(Coach):
         else:
             self.activations_set_counts[activations_set] = 1
 
+        if self.previous_activations_set is not None:
+            self.differentiation_miss += sum(
+                bin(a & b).count("1")
+                for a, b in zip(activations_set, self.previous_activations_set)
+            )
+
+        self.previous_activations_set = activations_set
+
         if c_time >= self.d_time:
             self.done = True
 
     # TODO: build a lesson plan
     def measure(self) -> Fitness:
         target_activations_component = div(self.target_activations_miss, self.d_time) + 1
+        differentiation_component = div(self.differentiation_miss, self.d_time) + 1
 
         target_axon_distance_component = div(sum(
             abs(self.mind.mind.dimension_size - n.position.city_distance(n.axon.position))
@@ -98,16 +107,18 @@ class Health(Coach):
 
         return (
             target_activations_component
+            * differentiation_component
             * target_axon_distance_component
             * activations_set_component
-            # TODO: punish the same synapses firing consecutively
         )
 
     def reset(self):
         super().reset()
         self.n_time = 0
         self.target_activations_miss = 0
+        self.differentiation_miss = 0
         self.activations_set_counts = {}
+        self.previous_activations_set = None
 
 
 class PetriDish(HasRandom):
