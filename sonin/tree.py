@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Callable, Generator
 
 from pydantic import BaseModel
 
@@ -9,11 +9,16 @@ class BinaryTree(BaseModel):
     root: Any | None
     is_leaf: Callable[[Any], bool]
 
-    def __iter__(self):
-        if self.is_leaf(self.root):
-            yield self.root
-        elif self.root is not None:
-            yield from iter(self.root)
+    def __iter__(self) -> Generator[Any, None, None]:
+        if self.root is not None:
+            if self.is_leaf(self.root):
+                yield self.root
+            else:
+                yield from self.root
+
+    def branches_iter(self) -> Generator[Any, None, None]:
+        if self.root is not None and not self.is_leaf(self.root):
+            yield from self.root.branches_iter()
 
     def find_child_and_parents(self, is_next_left: Callable[[], bool] = rand_bool):
         child = self.root

@@ -36,6 +36,7 @@ from sonin.model.neuron import Axon, TetanicPeriod
 )
 def test_tetanic_period(threshold: int, activations: int, gap: int, num_steps: int, expected: bool):
     tetanic_period = TetanicPeriod(
+        enabled=True,
         threshold=threshold,
         activations=activations,
         gap=gap,
@@ -47,11 +48,11 @@ def test_tetanic_period(threshold: int, activations: int, gap: int, num_steps: i
         c_time = i
         tetanic_period.step(c_time)
 
-    assert tetanic_period.is_active(c_time) == expected
+    assert tetanic_period.is_active(c_time) is expected
 
 
 @mark.parametrize(
-    'position, n_dimension, dimension_size, expected',
+    'position, num_dimensions, dimension_size, expected',
     [
         ((0,), 1, 1, (0,)),
 
@@ -80,10 +81,10 @@ def test_tetanic_period(threshold: int, activations: int, gap: int, num_steps: i
         ((2, 2), 2, 3, (-1, -1)),
     ],
 )
-def test_axon_direction(position: tuple[int, ...], n_dimension: int, dimension_size: int, expected: tuple[int, ...]):
+def test_axon_direction(position: tuple[int, ...], num_dimensions: int, dimension_size: int, expected: tuple[int, ...]):
     axon = Axon(
         position=Vector.of(position, dimension_size),
-        n_dimension=n_dimension,
+        num_dimensions=num_dimensions,
         dimension_size=dimension_size,
     )
 

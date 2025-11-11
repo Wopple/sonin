@@ -16,27 +16,37 @@ REFACTORY = 1
 
 
 class TetanicPeriod(BaseModel, HasStep):
-    """ Represents a periodic schedule of tetanic activations """
+    """ Represents a periodic schedule of tetanic activations
+
+    Tetanic activations are when a neuron periodically activates a bunch of times over a short period without input
+    stimulus. This can happen periodically for some neurons.
+    """
+
+    # Intended for use with mutation to enable or disable tetanic activations while keeping the other configuration
+    enabled: bool = Field(default=False)
 
     # Number of dormant steps before tetanic activations
-    threshold: int = Field(ge=0)
+    threshold: int = Field(default=0, ge=0)
 
     # Number of activations in each tetanus
-    activations: int = Field(ge=1)
+    activations: int = Field(default=1, ge=1)
 
     # Number of inactive steps between activations during tetanus
-    gap: int = Field(ge=0)
+    gap: int = Field(default=0, ge=0)
 
     # True if dormant, False if within tetanus
-    dormant: bool = True
+    dormant: bool = Field(default=True, exclude=True)
 
     # Time of next flip between dormant and tetanus
-    n_time: int = None
+    n_time: int = Field(default=None, exclude=True)
 
     def model_post_init(self, context: Any, /):
         self.n_time: int = self.threshold
 
     def step(self, c_time: int):
+        if not self.enabled:
+            return
+
         if self.dormant:
             if c_time >= self.n_time:
                 self.dormant = False
@@ -48,12 +58,12 @@ class TetanicPeriod(BaseModel, HasStep):
 
     def is_active(self, c_time) -> bool:
         """ Returns True if the neuron should fire """
-        return not self.dormant and (self.n_time - c_time) % (self.gap + 1) == 0
+        return self.enabled and not self.dormant and (self.n_time - c_time) % (self.gap + 1) == 0
 
 
 class Axon(BaseModel):
     position: Vector
-    n_dimension: int
+    num_dimensions: int
     dimension_size: int
     signals: dict[Signal, SignalCount] = Field(default_factory=dict)
     direction: Vector = None
@@ -61,7 +71,7 @@ class Axon(BaseModel):
     def model_post_init(self, context: Any, /):
         # All axons start out pointing at the center. This helps differentiate
         # neurons and expose them to the most signals.
-        double_center = Vector.of((self.dimension_size - 1,) * self.n_dimension, self.dimension_size)
+        double_center = Vector.of((self.dimension_size - 1,) * self.num_dimensions, self.dimension_size)
         double_position = self.position * 2
         self.direction = (double_center - double_position).city_unit()
 
@@ -83,13 +93,13 @@ class Neuron(BaseModel, HasStep):
     potential: int = 0
 
     # Potential threshold for activation
-    activation_level: int = Field(default=1, ge=1)
+    activation_level: int = Field(ge=1)
 
     # Number of dormant steps after activation
-    refactory_period: int = Field(default=0, ge=0)
+    refactory_period: int = Field(ge=0)
 
     # Periodic activations without need for input potential
-    tetanic_period: TetanicPeriod | None = None
+    tetanic_period: TetanicPeriod = Field(default_factory=TetanicPeriod)
 
     # Synapses connected to post neurons (output)
     post_synapses: dict[VectorIndex, Synapse] = Field(default_factory=dict)
@@ -106,7 +116,11 @@ class Neuron(BaseModel, HasStep):
     # Time at which to reactivate the neuron
     t_refactory_end: int = 0
 
+    # Measures how frequently the neuron is stimulated
     stimulation: Stimulation
+
+    # When the stimulation meets this threshold, it is modified to reduce activation frequency
+    overstimulation_threshold: int = Field(ge=1)
 
     # a sliding window of activation in the last 64 steps
     recent_activations: int = 0
@@ -117,7 +131,7 @@ class Neuron(BaseModel, HasStep):
 
     def step(self, c_time: int):
         self.stimulation.step()
-        self.tetanic_period and self.tetanic_period.step(c_time)
+        self.tetanic_period.step(c_time)
         self.recent_activations = (self.recent_activations << 1) % 64
 
         # if already activated (e.g. by input), skip
@@ -125,7 +139,7 @@ class Neuron(BaseModel, HasStep):
             pass
         # activate if potential is exceeded or there is a tetanic activation
         elif self.state == ACCEPTING:
-            is_tetanic = self.tetanic_period and self.tetanic_period.is_active(c_time)
+            is_tetanic = self.tetanic_period.is_active(c_time)
 
             if self.potential >= self.activation_level or is_tetanic:
                 self.activate(c_time)

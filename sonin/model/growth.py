@@ -16,6 +16,9 @@ SENDING = 1
 # cells become stable when all adjacent cells are SENDING or STABLE
 STABLE = 2
 
+# (signal, position, signal_count)
+type Environment = list[tuple[Signal, Vector, SignalCount]]
+
 
 class StemCell(BaseModel):
     position: Vector
@@ -33,11 +36,11 @@ class StemCell(BaseModel):
 
 
 class Incubator(BaseModel):
-    n_dimension: int
+    num_dimensions: int
     dimension_size: int
 
     # a static set of signals in the environment, this seeds variation to avoid symmetry
-    environment: list[tuple[Signal, SignalCount, Vector]]
+    environment: Environment
 
     # defines the affinity between signals
     signal_profile: SignalProfile
@@ -52,14 +55,14 @@ class Incubator(BaseModel):
         assert self.adjacent_edits is None
 
         self.cells = Hypercube(
-            n_dimension=self.n_dimension,
+            num_dimensions=self.num_dimensions,
             dimension_size=self.dimension_size,
         )
 
         self.adjacent_edits = []
-        base = [0] * self.n_dimension
+        base = [0] * self.num_dimensions
 
-        for idx in range(self.n_dimension):
+        for idx in range(self.num_dimensions):
             for e in (-1, 1):
                 copy = base.copy()
                 copy[idx] = e
@@ -142,8 +145,8 @@ class Incubator(BaseModel):
                 for send_position, pairs in groupby(open_channels, key=lambda t: t[0])
             ]
 
-            all_signals: list[tuple[Signal, SignalCount, Vector]] = self.environment + [
-                (signal, count, cell.position)
+            all_signals: Environment = self.environment + [
+                (signal, cell.position, count)
                 for cell in self.cells
                 for signal, count in cell.signals.items()
             ]
@@ -155,7 +158,7 @@ class Incubator(BaseModel):
             for send, receives in sending_cell_channels:
                 # get adjacent receiving position if it exists in the direction indicated by `positive`
                 def receive_by_dimension(dimension: int, positive: bool) -> Vector | None:
-                    edit: list[int] = [0] * self.n_dimension
+                    edit: list[int] = [0] * self.num_dimensions
                     edit[dimension] = 1 if positive else -1
                     adjacent_position = send.position + edit
 
@@ -174,7 +177,7 @@ class Incubator(BaseModel):
                             position,
                             2 ** 8 * count
                         )
-                        for signal, count, position in all_signals
+                        for signal, position, count in all_signals
                     ]
 
                     # For each dimension, we can get the component forces to split the signals. There are two
@@ -184,7 +187,7 @@ class Incubator(BaseModel):
                     total_force_all_dimensions = sum(abs(v) for f in forces for v in f.value)
 
                     if total_force_all_dimensions > 0:
-                        for dimension in range(self.n_dimension):
+                        for dimension in range(self.num_dimensions):
                             total_positive_force: int = sum(f.value[dimension] for f in forces if f.value[dimension] > 0)
                             total_negative_force: int = sum(-f.value[dimension] for f in forces if f.value[dimension] < 0)
                             positive_target = receive_by_dimension(dimension, positive=True)

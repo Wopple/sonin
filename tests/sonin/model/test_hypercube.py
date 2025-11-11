@@ -3,24 +3,21 @@ from pytest import mark
 from sonin.model.dna import Dna
 from sonin.model.fate import FateTree
 from sonin.model.hypercube import CityShape, CubeShape, Hypercube, Vector
-from sonin.model.signal import SignalProfile
 
 DIMENSION_SIZE = 50
 
 
-def dna(n_dimension: int, dimension_size: int) -> Dna:
+def dna(num_dimensions: int, dimension_size: int) -> Dna:
     return Dna(
-        n_dimension=n_dimension,
+        num_dimensions=num_dimensions,
         dimension_size=dimension_size,
-        n_synapse=1,
-        activation_level=1,
-        max_neuron_strength=1,
-        axon_range=1,
+        max_synapses=1,
+        max_synapse_strength=1,
+        max_axon_range=1,
         refactory_period=1,
-        environment=[],
+        encoded_environment=[],
         incubation_signals={},
-        signal_profile=SignalProfile(affinities={}),
-        overstimulation_threshold=1,
+        affinities={},
         fate_tree=FateTree(),
     )
 
@@ -462,7 +459,7 @@ def test_initialize():
     test_dna = dna(3, 3)
 
     hypercube = Hypercube(
-        n_dimension=test_dna.n_dimension,
+        num_dimensions=test_dna.num_dimensions,
         dimension_size=test_dna.dimension_size,
     )
 
@@ -538,7 +535,7 @@ def test_initialize():
 )
 def test_center(dna: Dna, expected_center: list[tuple[int, ...]]):
     hypercube = Hypercube(
-        n_dimension=dna.n_dimension,
+        num_dimensions=dna.num_dimensions,
         dimension_size=dna.dimension_size,
     )
 

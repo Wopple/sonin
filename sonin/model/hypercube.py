@@ -4,7 +4,22 @@ from pydantic import BaseModel, Field
 
 from sonin.sonin_math import div
 
+KIND_CUBE = 0
+KIND_CITY = 1
+
 type VectorIndex = int
+
+
+def parse_shape(shape: Any) -> BaseModel:
+    if isinstance(shape, BaseModel):
+        return shape
+    elif isinstance(shape, dict):
+        if shape['kind'] == KIND_CUBE:
+            return CubeShape(**shape)
+        elif shape['kind'] == KIND_CITY:
+            return CityShape(**shape)
+
+    raise ValueError(f'Unable to parse: {shape}')
 
 
 class Vector(BaseModel):
@@ -30,7 +45,7 @@ class Vector(BaseModel):
             self.index = sum(v * self.dimension_size ** i for i, v in enumerate(reversed(self.value)))
 
     @property
-    def n_dimension(self) -> int:
+    def num_dimensions(self) -> int:
         return len(self.value)
 
     def __eq__(self, other: Self):
@@ -61,13 +76,8 @@ class Vector(BaseModel):
         if isinstance(other, int):
             return Vector.of(tuple(v + other for v in self.value), self.dimension_size)
         elif isinstance(other, tuple | list):
-            assert self.n_dimension == len(other), f'{self.n_dimension} != {len(other)}'
-
             return Vector.of(tuple(s + o for s, o in zip(self.value, other)), self.dimension_size)
         elif isinstance(other, Vector):
-            assert self.dimension_size == other.dimension_size, f'{self.dimension_size} != {other.dimension_size}'
-            assert self.n_dimension == other.n_dimension, f'{self.n_dimension} != {other.n_dimension}'
-
             return Vector.of(tuple(s + o for s, o in zip(self.value, other.value)), self.dimension_size)
         else:
             raise TypeError(f'Vector.__add__ unexpected type: {other}')
@@ -92,9 +102,7 @@ class Vector(BaseModel):
         if isinstance(other, int):
             return Vector.of(tuple(v * other for v in self.value), self.dimension_size)
         elif isinstance(other, Vector):
-            assert self.dimension_size == other.dimension_size, f'{self.dimension_size} != {other.dimension_size}'
-
-            return sum(self.value[idx] * other.value[idx] for idx in range(self.n_dimension))
+            return sum(self.value[idx] * other.value[idx] for idx in range(self.num_dimensions))
         else:
             raise TypeError(f'Vector.__mul__ unexpected type: {other}')
 
@@ -162,7 +170,7 @@ class Vector(BaseModel):
         largest = max(abs(c) for c in self.value)
 
         if largest == 0:
-            return Vector.of((0,) * self.n_dimension, self.dimension_size)
+            return Vector.of((0,) * self.num_dimensions, self.dimension_size)
 
         # This algorithm will be close and usually correct, but not always.
         # This algorithm can be improved if necessary by checking the adjacent
@@ -210,6 +218,8 @@ class CubeShape(Shape):
     [][][][][]
     """
 
+    kind: int = KIND_CUBE
+
     def positions(self) -> Generator[Vector, None, None]:
         # Iterate through layers. Recursively call for each lower dimension with the size of the layer.
         def iterate(
@@ -226,7 +236,7 @@ class CubeShape(Shape):
                     yield from iterate(dimension - 1, (absolute_idx,) + position)
 
         # only yield positions that are in bounds
-        for value in iterate(self.center.n_dimension - 1, ()):
+        for value in iterate(self.center.num_dimensions - 1, ()):
             candidate_position = Vector.of(value, self.center.dimension_size)
 
             if not candidate_position.out_of_bounds():
@@ -253,6 +263,8 @@ class CityShape(Shape):
         []
     """
 
+    kind: int = KIND_CITY
+
     def positions(self) -> Generator[Vector, None, None]:
         # Iterate through layers. Recursively call for each lower dimension with the size of the layer.
         def iterate(
@@ -270,7 +282,7 @@ class CityShape(Shape):
                     yield from iterate(dimension - 1, size - abs(relative_idx), (absolute_idx,) + position)
 
         # only yield positions that are in bounds
-        for value in iterate(self.center.n_dimension - 1, self.size, ()):
+        for value in iterate(self.center.num_dimensions - 1, self.size, ()):
             candidate_position = Vector.of(value, self.center.dimension_size)
 
             if not candidate_position.out_of_bounds():
@@ -278,7 +290,7 @@ class CityShape(Shape):
 
 
 class Hypercube[T](BaseModel):
-    n_dimension: int
+    num_dimensions: int
     dimension_size: int
     items: list[T] = Field(default_factory=list)
 
@@ -286,17 +298,17 @@ class Hypercube[T](BaseModel):
         return iter(self.items)
 
     def initialize(self, create_item: Callable[[Vector], T]):
-        def create_items(n_dimension: int, position: Vector) -> Generator[T, None, None]:
-            if n_dimension == 0:
+        def create_items(num_dimensions: int, position: Vector) -> Generator[T, None, None]:
+            if num_dimensions == 0:
                 # Only yield completed vectors.
                 yield create_item(position)
             else:
                 # Create a copy for every possible next index and recurse on each of them
                 # yielding all results.
                 for p in range(self.dimension_size):
-                    yield from create_items(n_dimension - 1, position.grow(p))
+                    yield from create_items(num_dimensions - 1, position.grow(p))
 
-        self.items = list(create_items(self.n_dimension, Vector.of((), self.dimension_size)))
+        self.items = list(create_items(self.num_dimensions, Vector.of((), self.dimension_size)))
 
     def get(self, position: int | tuple[int, ...] | list[int] | Vector) -> T:
         if isinstance(position, int):
@@ -311,7 +323,7 @@ class Hypercube[T](BaseModel):
 
         # for even dimension sizes, this is the corner with the smallest indices
         center = Vector.of(
-            (div(self.dimension_size - 1, 2),) * self.n_dimension,
+            (div(self.dimension_size - 1, 2),) * self.num_dimensions,
             self.dimension_size,
         )
 
@@ -329,5 +341,5 @@ class Hypercube[T](BaseModel):
 
             return [
                 self.get(center + edit)
-                for edit in permute(self.n_dimension, [])
+                for edit in permute(self.num_dimensions, [])
             ]

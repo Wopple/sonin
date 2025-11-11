@@ -5,29 +5,26 @@ from sonin.model.fate import FateTree
 from sonin.model.hypercube import Vector
 from sonin.model.mind import strengthen_connection, weaken_connection
 from sonin.model.neuron import Axon, Neuron
-from sonin.model.signal import SignalProfile
 from sonin.model.stimulation import Stimulation
 
 
 @fixture
-def n_dimension() -> int:
+def num_dimensions() -> int:
     return 1
 
 
 @fixture
-def dna(n_dimension: int) -> Dna:
+def dna(num_dimensions: int) -> Dna:
     return Dna(
-        n_dimension=n_dimension,
+        num_dimensions=num_dimensions,
         dimension_size=2,
-        n_synapse=1,
-        activation_level=1,
-        max_neuron_strength=1,
-        axon_range=1,
+        max_synapses=1,
+        max_synapse_strength=1,
+        max_axon_range=1,
         refactory_period=1,
-        environment=[],
+        encoded_environment=[],
         incubation_signals={},
-        signal_profile=SignalProfile(affinities={}),
-        overstimulation_threshold=1,
+        affinities={},
         fate_tree=FateTree(),
     )
 
@@ -38,10 +35,11 @@ def neuron_1(dna: Dna) -> Neuron:
 
     return Neuron(
         position=position,
-        axon=Axon(position=position, n_dimension=dna.n_dimension, dimension_size=dna.dimension_size),
-        activation_level=dna.activation_level,
+        axon=Axon(position=position, num_dimensions=dna.num_dimensions, dimension_size=dna.dimension_size),
+        activation_level=1,
         refactory_period=dna.refactory_period,
         stimulation=Stimulation(),
+        overstimulation_threshold=1,
     )
 
 
@@ -51,10 +49,11 @@ def neuron_2(dna: Dna) -> Neuron:
 
     return Neuron(
         position=position,
-        axon=Axon(position=position, n_dimension=dna.n_dimension, dimension_size=dna.dimension_size),
-        activation_level=dna.activation_level,
+        axon=Axon(position=position, num_dimensions=dna.num_dimensions, dimension_size=dna.dimension_size),
+        activation_level=1,
         refactory_period=dna.refactory_period,
         stimulation=Stimulation(),
+        overstimulation_threshold=1,
     )
 
 

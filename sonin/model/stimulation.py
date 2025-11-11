@@ -10,10 +10,11 @@ class SnapBack(BaseModel):
     baseline: int = 0
 
     # Higher values create a faster snap back
-    # 1: no snap back adjustment
+    # 1: no snap back adjustment unless restore_damper == 0
     restore_rate: int = Field(default=1, ge=1)
 
     # Higher values create a slower snap back
+    # Must be <= restore_rate
     # 0: snaps back all the way immediately
     restore_damper: int = Field(default=0, ge=0)
 

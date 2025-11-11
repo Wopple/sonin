@@ -5,7 +5,6 @@ import matplotlib.pyplot as plot
 from sonin.model.dna import Dna
 from sonin.model.evolution import Health, PetriDish
 from sonin.model.mind import Mind, MindInterface
-from sonin.model.mutation import DnaMutagen
 from sonin.model.storage import load_samples_local, save_samples_local
 from sonin.sonin_random import seed
 
@@ -139,11 +138,22 @@ from sonin.sonin_random import seed
 #     4. Competition
 #       - minds compete with each other
 
+# Advantages
+#   - Cycles: logical circuits can form cyclic graphs
+#   - Memory: each neuron is stateful to support memory
+#   - Neuroplasticity: the connections of neurons can update through activity to support learning from experience
+#   - Incrementality: can build upon existing models
+#   - Coaching: can perform optimization without data through coaches
+#   - Customization: there are endless ways to customize the mechanics
 
-def run_and_plot(sample: DnaMutagen):
-    dna: Dna = sample.value
+# Disadvantages
+#   - Slope-less: there is no mathematical slope for gradient descent
+#   - Slow: each neuron is slower to process so it supports fewer neurons
+#   - Nascent: does not have 60+ years of research behind it
 
-    mind_interface: MindInterface = dna.build_mind()
+
+def run_and_plot(sample: Dna):
+    mind_interface: MindInterface = sample.build_mind()
     mind: Mind = mind_interface.mind
     mind.print_activations = True
     mind.randomize_potential()
@@ -190,12 +200,12 @@ def run_and_plot(sample: DnaMutagen):
     for i in range(32):
         mind.step(i)
 
-    # plot_synapses()
-    plot_axons()
+    plot_synapses()
+    # plot_axons()
 
 
 def evolve(
-    samples: list[DnaMutagen],
+    samples: list[Dna],
     name: str,
     min_generations: int,
     min_elapsed_time: timedelta,
@@ -204,7 +214,7 @@ def evolve(
         coach=Health(),
         sample_retention=4,
         num_descendants=4,
-        num_mutations=256,
+        num_mutations=4,
     )
 
     petri_dish.evolve(
@@ -220,6 +230,6 @@ if __name__ == '__main__':
     seed(1)
     name = 'progress1'
     samples = load_samples_local(name)
-    # samples = [DnaMutagen()]
-    evolve(samples, name, 10, timedelta(minutes=0))
-    # run_and_plot(samples[0])
+    # samples = [Dna.from_defaults()]
+    # evolve(samples, name, 5, timedelta(minutes=0))
+    run_and_plot(samples[0])

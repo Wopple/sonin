@@ -90,14 +90,14 @@ default_rng: Rng = Pcg32()  # changing this implementation will affect tests
 seed = default_rng.seed
 
 
-def rand_bool(rng: Rng = default_rng) -> bool:
+def rand_bool(*, rng: Rng = default_rng) -> bool:
     if rng.next_u32() & 1:
         return True
     else:
         return False
 
 
-def rand_int(lower: int | None = None, upper: int | None = None, rng: Rng = default_rng) -> int:
+def rand_int(lower: int | None = None, upper: int | None = None, *, rng: Rng = default_rng) -> int:
     assert lower is None or (-(2 ** 32) <= lower <= 2 ** 32 - 1)
     assert upper is None or (-(2 ** 32) <= upper <= 2 ** 32 - 1)
     assert lower is None or upper is None or lower <= upper
@@ -113,40 +113,81 @@ def rand_int(lower: int | None = None, upper: int | None = None, rng: Rng = defa
     return (rng.next_u32() % (1 + upper - lower)) + lower
 
 
-def rand_sign(rng: Rng = default_rng) -> int:
-    if rand_bool(rng):
+def rand_sign(*, rng: Rng = default_rng) -> int:
+    if rand_bool(rng=rng):
         return 1
     else:
         return -1
 
 
-def choice[T](items: Iterable[T], rng: Rng = default_rng) -> T:
+def choice[T](items: Iterable[T], *, rng: Rng = default_rng) -> T:
     as_tuple = tuple(items)
-    return as_tuple[rand_int(0, len(as_tuple) - 1, rng)]
+    assert len(as_tuple) > 0
+    return as_tuple[rand_int(0, len(as_tuple) - 1, rng=rng)]
 
 
-def shuffle(items: list, rng: Rng = default_rng):
+def weighted_choice[T](items: Iterable[tuple[T, int]], *, rng: Rng = default_rng) -> T:
+    as_tuple = tuple(items)
+    random_weight = rand_int(1, sum(i[1] for i in as_tuple), rng=rng)
+    current_weight = 0
+
+    for value, weight in as_tuple:
+        current_weight += weight
+
+        if current_weight >= random_weight:
+            return value
+
+    raise RuntimeError('unreachable')
+
+
+def shuffle(items: list, *, rng: Rng = default_rng):
     for i in range(len(items)):
-        j = rand_int(0, len(items) - 1, rng)
+        j = rand_int(0, len(items) - 1, rng=rng)
         temp = items[i]
         items[i] = items[j]
         items[j] = temp
 
 
-class Random(BaseModel):
-    rng: Rng = default_rng
+class Random:
+    def __init__(self, rng: Rng | None = None):
+        self.rng: Rng = rng or default_rng
 
     def rand_bool(self) -> bool:
-        return rand_bool(self.rng)
+        return rand_bool(rng=self.rng)
 
     def rand_int(self, lower: int | None = None, upper: int | None = None) -> int:
-        return rand_int(lower, upper, self.rng)
+        return rand_int(lower, upper, rng=self.rng)
 
     def rand_sign(self) -> int:
-        return rand_sign(self.rng)
+        return rand_sign(rng=self.rng)
 
     def choice[T](self, items: Iterable[T]) -> T:
-        return choice(items, self.rng)
+        return choice(items, rng=self.rng)
+
+    def weighted_choice[T](self, items: Iterable[tuple[T, int]]) -> T:
+        return weighted_choice(items, rng=self.rng)
 
     def shuffle(self, items: list):
-        return shuffle(items, self.rng)
+        return shuffle(items, rng=self.rng)
+
+
+class HasRandom:
+    random: Random = Random()
+
+    def rand_bool(self) -> bool:
+        return self.random.rand_bool()
+
+    def rand_int(self, lower: int | None = None, upper: int | None = None) -> int:
+        return self.random.rand_int(lower, upper)
+
+    def rand_sign(self) -> int:
+        return self.random.rand_sign()
+
+    def choice[T](self, items: Iterable[T]) -> T:
+        return self.random.choice(items)
+
+    def weighted_choice[T](self, items: Iterable[tuple[T, int]]) -> T:
+        return self.random.weighted_choice(items)
+
+    def shuffle(self, items: list):
+        return self.random.shuffle(items)
