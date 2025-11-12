@@ -142,7 +142,7 @@ class Health(Coach):
         max_axons_in_same_position = max(
             len(list(g))
             for _, g in groupby(sorted(n.axon.position.value for n in self.mind.mind.neurons))
-        ) + len(self.mind.mind.neurons.items)
+        )
 
         axon_variance_component = abs(self.target_axon_load - max_axons_in_same_position) + 1
         need_more_axon_movement = max_axons_in_same_position < self.target_axon_load
@@ -160,11 +160,11 @@ class Health(Coach):
         )[0]
 
         return (
-            target_activations_component
-            * activation_variance_component
-            * target_axon_distance_component
-            * axon_variance_component
-            * activations_set_component,
+            target_activations_component ** 1
+            * activation_variance_component ** 1
+            * target_axon_distance_component ** 8
+            * axon_variance_component ** 1
+            * activations_set_component ** 1,
             LessonPlan(plan={lesson: Gear(up=lesson_weight)}),
         )
 
