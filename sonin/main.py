@@ -198,11 +198,13 @@ def run_and_plot(sample: Dna):
         ax.set_title('Axons')
         plot.show()
 
+    plot_axons()
+    plot_synapses()
+
     for i in range(32):
         mind.step(i)
 
     plot_synapses()
-    plot_axons()
 
 
 def evolve(

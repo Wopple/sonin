@@ -82,7 +82,7 @@ class Mind(BaseModel, HasRandom, HasStep):
 
         # [(negative, positive)]
         clipped_ranges: list[tuple[int, int]] = [
-            (max(-self.axon_range, -v), min(self.axon_range, self.dimension_size - 1 - v))
+            (max(0, v - self.axon_range), min(self.dimension_size - 1, v + self.axon_range))
             for v in position.value
         ]
 
