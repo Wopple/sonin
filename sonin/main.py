@@ -202,7 +202,7 @@ def run_and_plot(sample: Dna):
         mind.step(i)
 
     plot_synapses()
-    # plot_axons()
+    plot_axons()
 
 
 def evolve(
@@ -232,5 +232,5 @@ if __name__ == '__main__':
     name = 'progress1'
     samples = load_samples_local(name)
     # samples = [Dna.from_defaults()]
-    # evolve(samples, name, 5, timedelta(minutes=0))
+    # evolve(samples, name, 32, timedelta(minutes=0))
     run_and_plot(samples[0])

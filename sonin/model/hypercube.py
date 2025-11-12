@@ -173,8 +173,6 @@ class Vector(BaseModel):
             return Vector.of((0,) * self.num_dimensions, self.dimension_size)
 
         # This algorithm will be close and usually correct, but not always.
-        # This algorithm can be improved if necessary by checking the adjacent
-        # positions or by doing a proper cosine similarity check.
         # The intuition is, if a component of the vector has a relatively high
         # magnitude compared to the other components, the unit vector likely
         # has a magnitude of 1 in the same direction.

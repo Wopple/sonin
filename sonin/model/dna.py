@@ -119,8 +119,7 @@ class Dna(BaseModel):
                 position=cell.position,
                 axon=Axon(
                     position=cell.position,
-                    num_dimensions=self.num_dimensions,
-                    dimension_size=self.dimension_size,
+                    signals=fate.axon_signals,
                 ),
                 signals=cell.signals,
                 excites=fate.excites,

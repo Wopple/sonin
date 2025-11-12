@@ -63,15 +63,17 @@ class TetanicPeriod(BaseModel, HasStep):
 
 class Axon(BaseModel):
     position: Vector
-    num_dimensions: int
-    dimension_size: int
     signals: dict[Signal, SignalCount] = Field(default_factory=dict)
     direction: Vector = None
 
     def model_post_init(self, context: Any, /):
         # All axons start out pointing at the center. This helps differentiate
         # neurons and expose them to the most signals.
-        double_center = Vector.of((self.dimension_size - 1,) * self.num_dimensions, self.dimension_size)
+        double_center = Vector.of(
+            (self.position.dimension_size - 1,) * self.position.num_dimensions,
+            self.position.dimension_size,
+        )
+
         double_position = self.position * 2
         self.direction = (double_center - double_position).city_unit()
 
@@ -93,10 +95,10 @@ class Neuron(BaseModel, HasStep):
     potential: int = 0
 
     # Potential threshold for activation
-    activation_level: int = Field(ge=1)
+    activation_level: int = Field(default=1, ge=1)
 
     # Number of dormant steps after activation
-    refactory_period: int = Field(ge=0)
+    refactory_period: int = Field(default=0, ge=0)
 
     # Periodic activations without need for input potential
     tetanic_period: TetanicPeriod = Field(default_factory=TetanicPeriod)
@@ -117,10 +119,10 @@ class Neuron(BaseModel, HasStep):
     t_refactory_end: int = 0
 
     # Measures how frequently the neuron is stimulated
-    stimulation: Stimulation
+    stimulation: Stimulation = Field(default_factory=Stimulation)
 
     # When the stimulation meets this threshold, it is modified to reduce activation frequency
-    overstimulation_threshold: int = Field(ge=1)
+    overstimulation_threshold: int = Field(default=1, ge=1)
 
     # a sliding window of activation in the last 64 steps
     recent_activations: int = 0

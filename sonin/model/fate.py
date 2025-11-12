@@ -130,14 +130,14 @@ class FateTree(BinaryTree):
 
     @field_validator('root', mode='before')
     @classmethod
-    def validate_fate_node(cls, node: dict[str, Any]) -> Any:
-        return parse_fate_node(node)
+    def validate_fate_node(cls, node: dict[str, Any] | None) -> Any | None:
+        return node and parse_fate_node(node)
 
     @field_serializer('root')
     @classmethod
-    def serialize_fate_node(cls, node: BaseModel) -> str | dict[str, Any]:
+    def serialize_fate_node(cls, node: BaseModel | None) -> str | dict[str, Any] | None:
         # necessary to call the specific serializer
-        return node.model_dump()
+        return node and node.model_dump()
 
     def get_fate(self, signals: dict[Signal, SignalCount]) -> Fate | None:
         return self.root.get_fate(signals) if self.root is not None else None

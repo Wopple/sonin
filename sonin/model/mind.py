@@ -135,7 +135,8 @@ class Mind(BaseModel, HasRandom, HasStep):
 
         all_signals: list[tuple[Signal, SignalCount, Vector]] = [
             (signal, signal_count, n.position)
-            for n in self.neurons for signal, signal_count in n.signals.items()
+            for n in self.neurons
+            for signal, signal_count in n.signals.items()
         ]
 
         for n in self.neurons:
@@ -169,7 +170,7 @@ class Mind(BaseModel, HasRandom, HasStep):
                             guide_signal,
                             axon_position,
                             guide_position,
-                            growth_signal_count * guide_signal_count,
+                            2 ** 8 * growth_signal_count * guide_signal_count,
                         )
 
                 # Stop if the net attraction is zero

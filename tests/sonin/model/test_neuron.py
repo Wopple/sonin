@@ -82,10 +82,6 @@ def test_tetanic_period(threshold: int, activations: int, gap: int, num_steps: i
     ],
 )
 def test_axon_direction(position: tuple[int, ...], num_dimensions: int, dimension_size: int, expected: tuple[int, ...]):
-    axon = Axon(
-        position=Vector.of(position, dimension_size),
-        num_dimensions=num_dimensions,
-        dimension_size=dimension_size,
-    )
+    axon = Axon(position=Vector.of(position, dimension_size))
 
     assert axon.direction.value == expected

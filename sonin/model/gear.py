@@ -5,10 +5,10 @@ from sonin.sonin_math import div
 
 class Gear(BaseModel):
     # Increases output speed
-    up: int = Field(ge=1)
+    up: int = Field(default=1, ge=1)
 
     # Decreases output speed
-    down: int = Field(ge=1)
+    down: int = Field(default=1, ge=1)
 
     # Stores the progress towards the next output to avoid loss of precision due to int division rounding.
     # Changes to up and down should scale the current as well, but this is likely an unnecessary level of precision.
