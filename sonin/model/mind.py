@@ -2,9 +2,9 @@ from typing import Any, Generator
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sonin.model.hypercube import Hypercube, Shape, Vector, VectorIndex
+from sonin.model.hypercube import Hypercube, Vector, VectorIndex
 from sonin.model.neuron import ACCEPTING, Neuron
-from sonin.model.signal import Signal, SignalCount, SignalProfile
+from sonin.model.paint import Shape
 from sonin.model.step import HasStep
 from sonin.model.synapse import Synapse
 from sonin.sonin_math import div
@@ -55,13 +55,12 @@ class Mind(BaseModel, HasRandom, HasStep):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # mutable properties
-    max_synapses: int
     num_dimensions: int
     dimension_size: int
+    max_synapses: int
     max_synapse_strength: int
-    axon_range: int
+    max_axon_range: int
     neurons: Hypercube[Neuron]
-    signal_profile: SignalProfile
 
     # interface
     input_indices: set[VectorIndex] = set()
@@ -72,7 +71,6 @@ class Mind(BaseModel, HasRandom, HasStep):
     # metrics
     num_activations: int = 0
     activation_set: list[int] = Field(default_factory=list)
-    effective_range: dict[Signal, int] = Field(default_factory=dict)
 
     def positions_in_range(self, position: Vector, exclude_input: bool = False) -> Generator[Vector, None, None]:
         """
@@ -82,7 +80,7 @@ class Mind(BaseModel, HasRandom, HasStep):
 
         # [(negative, positive)]
         clipped_ranges: list[tuple[int, int]] = [
-            (max(0, v - self.axon_range), min(self.dimension_size - 1, v + self.axon_range))
+            (max(0, v - self.max_axon_range), min(self.dimension_size - 1, v + self.max_axon_range))
             for v in position.value
         ]
 
@@ -129,68 +127,7 @@ class Mind(BaseModel, HasRandom, HasStep):
             else:
                 n.potential = 0
 
-    # TODO: consider preventing axons from centering on input neurons since they cannot form synapses
-    def guide_axons(self):
-        max_range = self.num_dimensions * self.dimension_size
-
-        all_signals: list[tuple[Signal, SignalCount, Vector]] = [
-            (signal, signal_count, n.position)
-            for n in self.neurons
-            for signal, signal_count in n.signals.items()
-        ]
-
-        for n in self.neurons:
-            axon = n.axon
-            axon_position = axon.position
-            growth_signals = axon.signals
-            past_positions = set()
-            direction = axon.direction
-
-            # Stop if trying to move to a past position
-            while axon_position not in past_positions:
-                past_positions.add(axon_position)
-
-                attraction = Vector.of((0,) * self.num_dimensions, self.dimension_size)
-
-                # Sum the attractive effects between the signals
-                for guide_signal, guide_signal_count, guide_position in all_signals:
-                    distance = guide_position.city_distance(axon_position)
-
-                    # skip signals that are out of range
-                    if distance > self.effective_range.get(guide_signal, max_range):
-                        continue
-
-                    # skip signals that are behind the axon
-                    if direction * (guide_position - axon_position) < 0:
-                        continue
-
-                    for growth_signal, growth_signal_count in growth_signals.items():
-                        attraction += self.signal_profile.attraction_force(
-                            growth_signal,
-                            guide_signal,
-                            axon_position,
-                            guide_position,
-                            2 ** 8 * growth_signal_count * guide_signal_count,
-                        )
-
-                # Stop if the net attraction is zero
-                if all(c == 0 for c in attraction.value):
-                    break
-
-                # Let the previous direction affect the new direction
-                direction = (direction + attraction).city_unit()
-
-                # Move the axon clipping to the hypercube size
-                axon_position = (axon_position + direction).clip()
-
-            axon.position = axon_position
-
     def step(self, c_time: int):
-        """
-        Advance the mind forward one step.
-        `c_time` is a monotonically increasing step number.
-        """
-
         self.num_activations = 0
         self.activation_set = []
 
@@ -285,7 +222,7 @@ class Mind(BaseModel, HasRandom, HasStep):
             # c_time 2
             #   pre:  0010
             #   post: 0001
-            return bin((pre.recent_activations >> 1) & post.recent_activations).count("1") > 0
+            return bin((pre.recent_activations >> 1) & post.recent_activations).count('1') > 0
 
         # form a new synapse
         candidates = []
@@ -321,18 +258,24 @@ class MindInterface(BaseModel, HasStep):
     def model_post_init(self, context: Any, /):
         input_indices: set[VectorIndex] = set()
 
-        self.input_neurons = [self.mind.neurons.get(p) for p in self.input_shape.positions()]
-        input_indices.union({p.index for p in self.input_shape.positions()})
+        input_positions = list(self.input_shape.positions(self.mind.num_dimensions, self.mind.dimension_size))
+        self.input_neurons = [self.mind.neurons.get(p) for p in input_positions]
+        input_indices.union({p.index for p in input_positions})
 
-        self.output_neurons = [self.mind.neurons.get(p) for p in self.output_shape.positions()]
+        self.output_neurons = [
+            self.mind.neurons.get(p)
+            for p in self.output_shape.positions(self.mind.num_dimensions, self.mind.dimension_size)
+        ]
 
         if self.reward_shape:
-            self.reward_neurons = [self.mind.neurons.get(p) for p in self.reward_shape.positions()]
-            input_indices.union({p.index for p in self.reward_shape.positions()})
+            reward_positions = list(self.reward_shape.positions(self.mind.num_dimensions, self.mind.dimension_size))
+            self.reward_neurons = [self.mind.neurons.get(p) for p in reward_positions]
+            input_indices.union({p.index for p in reward_positions})
 
         if self.punish_shape:
-            self.punish_neurons = [self.mind.neurons.get(p) for p in self.punish_shape.positions()]
-            input_indices.union({p.index for p in self.punish_shape.positions()})
+            punish_positions = list(self.punish_shape.positions(self.mind.num_dimensions, self.mind.dimension_size))
+            self.punish_neurons = [self.mind.neurons.get(p) for p in punish_positions]
+            input_indices.union({p.index for p in punish_positions})
 
         self.mind.input_indices = input_indices
 

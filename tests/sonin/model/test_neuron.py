@@ -50,38 +50,3 @@ def test_tetanic_period(threshold: int, activations: int, gap: int, num_steps: i
 
     assert tetanic_period.is_active(c_time) is expected
 
-
-@mark.parametrize(
-    'position, num_dimensions, dimension_size, expected',
-    [
-        ((0,), 1, 1, (0,)),
-
-        ((0,), 1, 2, (1,)),
-        ((1,), 1, 2, (-1,)),
-
-        ((0,), 1, 3, (1,)),
-        ((1,), 1, 3, (0,)),
-        ((2,), 1, 3, (-1,)),
-
-        ((0, 0), 2, 1, (0, 0)),
-
-        ((0, 0), 2, 2, (1, 1)),
-        ((1, 0), 2, 2, (-1, 1)),
-        ((0, 1), 2, 2, (1, -1)),
-        ((1, 1), 2, 2, (-1, -1)),
-
-        ((0, 0), 2, 3, (1, 1)),
-        ((1, 0), 2, 3, (0, 1)),
-        ((2, 0), 2, 3, (-1, 1)),
-        ((0, 1), 2, 3, (1, 0)),
-        ((1, 1), 2, 3, (0, 0)),
-        ((2, 1), 2, 3, (-1, 0)),
-        ((0, 2), 2, 3, (1, -1)),
-        ((1, 2), 2, 3, (0, -1)),
-        ((2, 2), 2, 3, (-1, -1)),
-    ],
-)
-def test_axon_direction(position: tuple[int, ...], num_dimensions: int, dimension_size: int, expected: tuple[int, ...]):
-    axon = Axon(position=Vector.of(position, dimension_size))
-
-    assert axon.direction.value == expected

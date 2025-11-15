@@ -1,25 +1,10 @@
-from typing import Any, Callable, Generator, Iterator, Self
+from typing import Any, Callable, Generator, Iterator, Literal, Self
 
 from pydantic import BaseModel, Field
 
 from sonin.sonin_math import div
 
-KIND_CUBE = 0
-KIND_CITY = 1
-
 type VectorIndex = int
-
-
-def parse_shape(shape: Any) -> BaseModel:
-    if isinstance(shape, BaseModel):
-        return shape
-    elif isinstance(shape, dict):
-        if shape['kind'] == KIND_CUBE:
-            return CubeShape(**shape)
-        elif shape['kind'] == KIND_CITY:
-            return CityShape(**shape)
-
-    raise ValueError(f'Unable to parse: {shape}')
 
 
 class Vector(BaseModel):
@@ -47,6 +32,9 @@ class Vector(BaseModel):
     @property
     def num_dimensions(self) -> int:
         return len(self.value)
+
+    def __getitem__(self, item: int) -> int:
+        return self.value[item]
 
     def __eq__(self, other: Self):
         return self.index == other.index
@@ -188,103 +176,49 @@ class Vector(BaseModel):
         return Vector.of(tuple(approximate_coordinate(c) for c in self.value), self.dimension_size)
 
 
-class Shape(BaseModel):
-    center: Vector | None = None
-    size: int = Field(default=1, ge=1)
-
-    def positions(self) -> Generator[Vector, None, None]:
-        raise NotImplementedError(f"{self.__class__.__name__}.positions")
+type Position = AbsPosition | RelPosition
 
 
-class CubeShape(Shape):
+class BasePosition(BaseModel):
+    def get(self, dimension_size: int = None) -> Vector:
+        raise NotImplementedError(f'{self.__class__.__name__}.get')
+
+
+class AbsPosition(BaseModel):
+    ty: Literal['Abs'] = 'Abs'
+    value: Vector
+
+    def get(self, dimension_size: int = None) -> Vector:
+        return self.value
+
+
+class RelPosition(BaseModel):
     """
-    Produces shapes like:
+    Each item encodes the relative position within the dimension associated with its index in the list. The list must be
+    of size num_dimensions. Each position component is calculated as:
 
-    size: 1
-    CT
+    dimension_size * Numerator // (Numerator + DenominatorDelta)
 
-    size: 2
-    [][][]
-    []CT[]
-    [][][]
+    (0, n) where n > 0 means: 0 // (0 + n) or 0%
+    (n, 0) where n > 0 means: n // (n + 0) or 100%
+    (n, n) where n > 0 means: n // (n + n) or 50%
+    (3, 1)             means: 3 // (3 + 1) or 75%
+    (2, 3)             means: 2 // (2 + 3) or 40%
+    [(3, 1), (2, 3)] means: 75% along dimension 0 and 40% along dimension 1
 
-    size: 3
-    [][][][][]
-    [][][][][]
-    [][]CT[][]
-    [][][][][]
-    [][][][][]
-    """
-
-    kind: int = KIND_CUBE
-
-    def positions(self) -> Generator[Vector, None, None]:
-        # Iterate through layers. Recursively call for each lower dimension with the size of the layer.
-        def iterate(
-            dimension: int,
-            position: tuple[int, ...],
-        ) -> Generator[tuple[int, ...], None, None]:
-            for idx in range(self.size * 2 - 1):
-                relative_idx = idx - self.size + 1
-                absolute_idx = relative_idx + self.center.value[dimension]
-
-                if dimension == 0:
-                    yield (absolute_idx,) + position
-                else:
-                    yield from iterate(dimension - 1, (absolute_idx,) + position)
-
-        # only yield positions that are in bounds
-        for value in iterate(self.center.num_dimensions - 1, ()):
-            candidate_position = Vector.of(value, self.center.dimension_size)
-
-            if not candidate_position.out_of_bounds():
-                yield candidate_position
-
-
-class CityShape(Shape):
-    """
-    Produces shapes like:
-
-    size: 1
-    CT
-
-    size: 2
-      []
-    []CT[]
-      []
-
-    size: 3
-        []
-      [][][]
-    [][]CT[][]
-      [][][]
-        []
+    This allows for encodings that remain consistent across different dimension sizes.
     """
 
-    kind: int = KIND_CITY
+    ty: Literal['Rel'] = 'Rel'
+    value: list[tuple[int, int]]
 
-    def positions(self) -> Generator[Vector, None, None]:
-        # Iterate through layers. Recursively call for each lower dimension with the size of the layer.
-        def iterate(
-            dimension: int,
-            size: int,
-            position: tuple[int, ...],
-        ) -> Generator[tuple[int, ...], None, None]:
-            for idx in range(size * 2 - 1):
-                relative_idx = idx - size + 1
-                absolute_idx = relative_idx + self.center.value[dimension]
-
-                if dimension == 0:
-                    yield (absolute_idx,) + position
-                else:
-                    yield from iterate(dimension - 1, size - abs(relative_idx), (absolute_idx,) + position)
-
-        # only yield positions that are in bounds
-        for value in iterate(self.center.num_dimensions - 1, self.size, ()):
-            candidate_position = Vector.of(value, self.center.dimension_size)
-
-            if not candidate_position.out_of_bounds():
-                yield candidate_position
+    def get(self, dimension_size: int) -> Vector:
+        return Vector.of(
+            tuple(
+                div(dimension_size * numerator, numerator + delta)
+                for numerator, delta in self.value
+            ),
+        )
 
 
 class Hypercube[T](BaseModel):

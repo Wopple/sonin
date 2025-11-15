@@ -3,7 +3,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from sonin.model.hypercube import Vector, VectorIndex
-from sonin.model.signal import Signal, SignalCount
 from sonin.model.step import HasStep
 from sonin.model.stimulation import Stimulation
 from sonin.model.synapse import Synapse
@@ -63,19 +62,6 @@ class TetanicPeriod(BaseModel, HasStep):
 
 class Axon(BaseModel):
     position: Vector
-    signals: dict[Signal, SignalCount] = Field(default_factory=dict)
-    direction: Vector = None
-
-    def model_post_init(self, context: Any, /):
-        # All axons start out pointing at the center. This helps differentiate
-        # neurons and expose them to the most signals.
-        double_center = Vector.of(
-            (self.position.dimension_size - 1,) * self.position.num_dimensions,
-            self.position.dimension_size,
-        )
-
-        double_position = self.position * 2
-        self.direction = (double_center - double_position).city_unit()
 
 
 class Neuron(BaseModel, HasStep):
@@ -84,9 +70,6 @@ class Neuron(BaseModel, HasStep):
 
     # Determines where synaptic connections can be made
     axon: Axon
-
-    # The signals this neuron emits
-    signals: dict[Signal, SignalCount] = Field(default_factory=set)
 
     # True if the neuron excites other neurons, False if it inhibits other neurons
     excites: bool = True

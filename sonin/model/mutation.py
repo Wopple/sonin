@@ -1,22 +1,120 @@
 from typing import Any
 
 from sonin.model.dna import Dna
-from sonin.model.fate import BinaryFate, Fate, IsLeft
+from sonin.model.fate import Fate
+from sonin.model.hypercube import AbsPosition, RelPosition, Vector
 from sonin.model.lesson import Lesson, LessonPlan
 from sonin.model.neuron import TetanicPeriod
-from sonin.model.signal import Signal, SignalCount
+from sonin.model.paint import CityShape, CompleteFill, Fill, FillShape, ModuloFill, OffsetFill, RectangleShape, Shape
 from sonin.model.stimulation import SnapBack, Stimulation
 from sonin.sonin_math import div
-from sonin.sonin_random import HasRandom, rand_int
+from sonin.sonin_random import HasRandom, Random
 
 # allows for scaling up and scaling down, 1 would not allow for scaling down while remaining above 0
 BASE_WEIGHT = 16
 
-# influences how quickly to add signals
-SIGNALS_WEIGHT = 4
-
-MAX_SIGNALS = 8
 MAX_SYNAPSES = 4
+
+
+def random_relative_coordinate(deviation_weight: int, random: Random) -> tuple[int, int]:
+    numerator = random.rand_int(0, deviation_weight)
+    delta = random.rand_int(0, deviation_weight)
+
+    if numerator == 0 and delta == 0:
+        if random.rand_bool():
+            numerator = random.rand_int(1, deviation_weight)
+        else:
+            delta = random.rand_int(1, deviation_weight)
+
+    return numerator, delta
+
+
+def random_fate(
+    num_dimensions: int,
+    dimension_size: int,
+    deviation_weight: int,
+    random: Random,
+) -> Fate:
+    return Fate(
+        excites=True,
+        axon_offset=tuple(
+            random.rand_sign() * random.rand_int(1, min(dimension_size - 1, deviation_weight))
+            for _ in range(num_dimensions)
+        ),
+        activation_level=random.rand_int(1, deviation_weight),
+        refactory_period=random.rand_int(0, deviation_weight),
+        stimulation=Stimulation(
+            amount=random.rand_int(1, deviation_weight),
+            snap_back=SnapBack(
+                baseline=0,
+                restore_rate=random.rand_int(1, deviation_weight),
+                restore_damper=1,
+            ),
+        ),
+        overstimulation_threshold=random.rand_int(1, deviation_weight),
+        tetanic_period=TetanicPeriod(
+            enabled=random.rand_bool(),
+            threshold=random.rand_int(0, deviation_weight),
+            activations=random.rand_int(1, deviation_weight),
+            gap=random.rand_int(0, deviation_weight),
+        ),
+    )
+
+
+def random_paint(
+    num_dimensions: int,
+    dimension_size: int,
+    deviation_weight: int,
+    random: Random,
+) -> Shape:
+    selected_shape = random.rand_int(0, 2)
+
+    # avoid complete fill, it would cover up everything else
+    selected_fill = random.rand_int(0 if selected_shape != 0 else 1, 2)
+
+    if selected_fill == 0:
+        fill: Fill = CompleteFill()
+    elif selected_fill == 1:
+        divisor = random.rand_int(2, dimension_size ** num_dimensions)
+        remainder = random.rand_int(0, divisor - 1)
+        fill: Fill = ModuloFill(divisor=divisor, remainder=remainder)
+    else:
+        base = tuple(
+            random.rand_int(0, dimension_size - 1)
+            for _ in range(num_dimensions)
+        )
+
+        offsets = tuple(
+            random.rand_int(0, dimension_size - 1)
+            for _ in range(num_dimensions)
+        )
+
+        fill: Fill = OffsetFill(base=base, offsets=offsets)
+
+    if selected_shape == 0:
+        return FillShape(fill=fill)
+    elif selected_shape == 1:
+        return RectangleShape(
+            center=RelPosition(value=[
+                random_relative_coordinate(deviation_weight, random)
+                for _ in range(num_dimensions)
+            ]),
+            sizes=tuple(random.rand_int(1, dimension_size) for _ in range(num_dimensions)),
+            fill=fill,
+            outline=random.rand_bool(),
+            wrap=random.rand_bool(),
+        )
+    else:
+        return CityShape(
+            center=RelPosition(value=[
+                random_relative_coordinate(deviation_weight, random)
+                for _ in range(num_dimensions)
+            ]),
+            size=random.rand_int(1, div(dimension_size + 1, 2)),
+            fill=fill,
+            outline=random.rand_bool(),
+            wrap=random.rand_bool(),
+        )
 
 
 class Mutagen(HasRandom):
@@ -46,26 +144,59 @@ class IntOps(HasRandom):
         self.min_value = min_value
         self.max_value = max_value
 
-    def clip(self, value: int) -> int:
-        return max(self.min_value, min(self.max_value, value))
+    def clip(self, value: int, min_value: int | None = None, max_value: int | None = None) -> int:
+        min_value = max(min_value if min_value is not None else self.min_value, self.min_value)
+        max_value = min(max_value if max_value is not None else self.max_value, self.max_value)
+        return max(min_value, min(max_value, value))
 
-    def add(self, value: int) -> int:
-        return self.clip(value + self.rand_int(1, self.deviation_weight))
+    def add(self, value: int, min_value: int | None = None, max_value: int | None = None) -> int:
+        return self.clip(value + self.rand_int(1, self.deviation_weight), min_value, max_value)
 
-    def sub(self, value: int) -> int:
-        return self.clip(value - self.rand_int(1, self.deviation_weight))
+    def sub(self, value: int, min_value: int | None = None, max_value: int | None = None) -> int:
+        return self.clip(value - self.rand_int(1, self.deviation_weight), min_value, max_value)
 
-    def update_int(self, value: int) -> int:
+    def update_int(self, value: int, min_value: int | None = None, max_value: int | None = None) -> int:
         if self.rand_bool():
-            return self.add(value)
+            return self.add(value, min_value, max_value)
         else:
-            return self.sub(value)
+            return self.sub(value, min_value, max_value)
 
 
-class DimensionSizeMutagen(Mutagen, IntOps):
+class TupleIntOps(HasRandom):
+    deviation_weight: int = 1
+
+    def __init__(
+        self,
+        min_value: int = -(2 ** 63),
+        max_value: int = 2 ** 63 - 1,
+    ):
+        self.int_ops = IntOps(min_value=min_value, max_value=max_value)
+
+        self.int_ops.random = self.random
+        self.int_ops.deviation_weight = self.deviation_weight
+
+    def update_tuple_int(
+        self,
+        value: tuple[int, ...],
+        min_value: int | None = None,
+        max_value: int | None = None,
+    ) -> tuple[int, ...]:
+        update_idx = self.rand_int(0, len(value) - 1)
+
+        return tuple(
+            v if idx != update_idx else self.int_ops.update_int(
+                value[update_idx],
+                min_value=min_value,
+                max_value=max_value,
+            )
+            for idx, v in enumerate(value)
+        )
+
+
+class AbsPositionMutagen(Mutagen, TupleIntOps):
     def __init__(self, deviation_weight: int = 1):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
-        IntOps.__init__(self, min_value=5, max_value=10)
+        TupleIntOps.__init__(self)
 
     def mutate(
         self,
@@ -74,7 +205,84 @@ class DimensionSizeMutagen(Mutagen, IntOps):
         lesson_plan: LessonPlan | None = None,
         subject: Any | None = None,
     ):
-        dna.dimension_size = self.update_int(dna.dimension_size)
+        assert isinstance(subject, AbsPosition)
+
+        min_value = 0
+        max_value = dna.dimension_size - 1
+        subject.value = Vector.of(
+            self.update_tuple_int(subject.value.value, min_value=min_value, max_value=max_value),
+            dna.dimension_size,
+        )
+
+
+class RelPositionMutagen(Mutagen, IntOps):
+    def __init__(self, deviation_weight: int = 1):
+        Mutagen.__init__(self, deviation_weight)
+        IntOps.__init__(self)
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        assert isinstance(subject, RelPosition)
+
+        base_weight = BASE_WEIGHT
+        update_numerator = base_weight
+        update_delta = base_weight
+
+        weights = [
+            (0, update_numerator),
+            (1, update_delta),
+        ]
+
+        for _ in range(num_mutations):
+            match self.weighted_choice(weights):
+                case 0: self.update_numerator(subject)
+                case 1: self.update_delta(subject)
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
+
+    def update_numerator(self, position: RelPosition):
+        update_idx = self.rand_int(0, len(position.value) - 1)
+        numerator, delta = position.value[update_idx]
+        min_value = 0 if delta > 0 else 1
+        new_numerator = self.update_int(numerator, min_value=min_value)
+        position.value[update_idx] = new_numerator, delta
+
+    def update_delta(self, position: RelPosition):
+        update_idx = self.rand_int(0, len(position.value) - 1)
+        numerator, delta = position.value[update_idx]
+        min_value = 0 if numerator > 0 else 1
+        new_delta = self.update_int(delta, min_value=min_value)
+        position.value[update_idx] = numerator, new_delta
+
+
+class PositionMutagen(Mutagen):
+    def __init__(
+        self,
+        deviation_weight: int = 1,
+        abs_position: AbsPositionMutagen | None = None,
+        rel_position: RelPositionMutagen | None = None,
+    ):
+        Mutagen.__init__(self, deviation_weight=deviation_weight)
+        self.abs_position = abs_position or AbsPositionMutagen()
+        self.rel_position = rel_position or RelPositionMutagen()
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        if isinstance(subject, AbsPosition):
+            self.abs_position.mutate(dna, num_mutations, lesson_plan, subject)
+        elif isinstance(subject, RelPosition):
+            self.rel_position.mutate(dna, num_mutations, lesson_plan, subject)
+        else:
+            raise ValueError(f'Expected Position: {subject}')
 
 
 class MaxSynapsesMutagen(Mutagen, IntOps):
@@ -89,9 +297,9 @@ class MaxSynapsesMutagen(Mutagen, IntOps):
         lesson_plan: LessonPlan | None = None,
         subject: Any | None = None,
     ):
-        base = BASE_WEIGHT
-        inc = base if dna.max_synapses < MAX_SYNAPSES else 0
-        dec = base if dna.max_synapses > 1 else 0
+        base_weight = BASE_WEIGHT
+        inc = base_weight if dna.max_synapses < MAX_SYNAPSES else 0
+        dec = base_weight if dna.max_synapses > 1 else 0
 
         weights = [
             (0, lesson_plan[Lesson.MORE_ACTIVATION](inc)),
@@ -104,7 +312,7 @@ class MaxSynapsesMutagen(Mutagen, IntOps):
                     dna.max_synapses = self.add(dna.max_synapses)
                 case 1:
                     dna.max_synapses = self.sub(dna.max_synapses)
-                case _: print(f"{self.__class__.__name__} failed to select a mutation")
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
 
 
 class MaxSynapseStrengthMutagen(Mutagen, IntOps):
@@ -119,9 +327,9 @@ class MaxSynapseStrengthMutagen(Mutagen, IntOps):
         lesson_plan: LessonPlan | None = None,
         subject: Any | None = None,
     ):
-        base = BASE_WEIGHT
-        inc = base
-        dec = base if dna.max_synapse_strength > 1 else 0
+        base_weight = BASE_WEIGHT
+        inc = base_weight
+        dec = base_weight if dna.max_synapse_strength > 1 else 0
 
         weights = [
             (0, lesson_plan[Lesson.MORE_ACTIVATION](inc)),
@@ -134,7 +342,7 @@ class MaxSynapseStrengthMutagen(Mutagen, IntOps):
                     dna.max_synapse_strength = self.add(dna.max_synapse_strength)
                 case 1:
                     dna.max_synapse_strength = self.sub(dna.max_synapse_strength)
-                case _: print(f"{self.__class__.__name__} failed to select a mutation")
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
 
 
 class MaxAxonRangeMutagen(Mutagen, IntOps):
@@ -149,328 +357,10 @@ class MaxAxonRangeMutagen(Mutagen, IntOps):
         lesson_plan: LessonPlan | None = None,
         subject: Any | None = None,
     ):
-        dna.max_axon_range = min(div(dna.dimension_size, 3), self.update_int(dna.max_axon_range))
+        dna.max_axon_range = self.update_int(dna.max_axon_range, max_value=div(dna.dimension_size, 3))
 
 
-class EnvironmentMutagen(Mutagen):
-    def mutate(
-        self,
-        dna: Dna | None = None,
-        num_mutations: int = 1,
-        lesson_plan: LessonPlan | None = None,
-        subject: Any | None = None,
-    ):
-        base = BASE_WEIGHT
-        add_entry = base
-        remove_entry = base if dna.encoded_environment else 0
-        change_signal = base if dna.encoded_environment else 0
-        move = base if dna.encoded_environment else 0
-        inc_signal_count = base if dna.encoded_environment else 0
-        dec_signal_count = base if dna.encoded_environment else 0
-
-        weights = [
-            (0, lesson_plan[Lesson.MORE_AXON_MOVEMENT](add_entry)),
-            (1, lesson_plan[Lesson.LESS_AXON_MOVEMENT](remove_entry)),
-            (2, change_signal),
-            (3, move),
-            (4, lesson_plan[Lesson.MORE_AXON_MOVEMENT](inc_signal_count)),
-            (5, lesson_plan[Lesson.LESS_AXON_MOVEMENT](dec_signal_count)),
-        ]
-
-        for _ in range(num_mutations):
-            match self.weighted_choice(weights):
-                case 0: self.add_entry(dna)
-                case 1: self.remove_entry(dna)
-                case 2: self.change_signal(dna)
-                case 3: self.move(dna)
-                case 4: self.inc_signal_count(dna)
-                case 5: self.dec_signal_count(dna)
-                case _: print(f"{self.__class__.__name__} failed to select a mutation")
-
-    def add_entry(self, dna: Dna):
-        center = self.rand_int(1, self.deviation_weight)
-
-        dna.encoded_environment.append((
-            self.choice(dna.signals),
-            [(center, center)] * dna.num_dimensions,
-            self.rand_int(1, self.deviation_weight),
-        ))
-
-    def remove_entry(self, dna: Dna):
-        del dna.encoded_environment[self.rand_int(0, len(dna.encoded_environment) - 1)]
-
-    def change_signal(self, dna: Dna):
-        update_idx = self.rand_int(0, len(dna.encoded_environment) - 1)
-        _, position, signal_count = dna.encoded_environment[update_idx]
-        dna.encoded_environment[update_idx] = self.choice(dna.signals), position, signal_count
-
-    def move(self, dna: Dna):
-        update_idx = self.rand_int(0, len(dna.encoded_environment) - 1)
-        update_dimension = self.rand_int(0, dna.num_dimensions - 1)
-        position = dna.encoded_environment[update_idx][1]
-        numerator, delta = position[update_dimension]
-
-        # clip to prevent (0, 0) which would cause a division by 0
-        if self.rand_bool():
-            clip = 0 if delta > 0 else 1
-            new_numerator = max(clip, numerator + self.rand_sign() * self.rand_int(1, self.deviation_weight))
-            position[update_dimension] = new_numerator, delta
-        else:
-            clip = 0 if numerator > 0 else 1
-            new_delta = max(clip, delta + self.rand_sign() * self.rand_int(1, self.deviation_weight))
-            position[update_dimension] = numerator, new_delta
-
-    def inc_signal_count(self, dna: Dna):
-        update_idx = self.rand_int(0, len(dna.encoded_environment) - 1)
-        signal, position, signal_count = dna.encoded_environment[update_idx]
-        new_count = signal_count + self.rand_int(1, self.deviation_weight)
-        dna.encoded_environment[update_idx] = signal, position, new_count
-
-    def dec_signal_count(self, dna: Dna):
-        update_idx = self.rand_int(0, len(dna.encoded_environment) - 1)
-        signal, position, signal_count = dna.encoded_environment[update_idx]
-        deviation = self.rand_int(1, self.deviation_weight)
-
-        if deviation < signal_count:
-            dna.encoded_environment[update_idx] = signal, position, signal_count - deviation
-        else:
-            del dna.encoded_environment[update_idx]
-
-
-class SignalCountsOps(HasRandom):
-    deviation_weight: int
-
-    def add_entry(self, dna: Dna, signal_counts: dict[Signal, SignalCount]):
-        for signal in dna.signals:
-            if signal not in signal_counts:
-                signal_counts[signal] = self.rand_int(1, self.deviation_weight)
-                break
-
-    def remove_entry(self, signal_counts: dict[Signal, SignalCount]):
-        del signal_counts[self.choice(signal_counts.keys())]
-
-    def change_signal(self, dna: Dna, signal_counts: dict[Signal, SignalCount]):
-        update_signal = self.choice(signal_counts.keys())
-        candidates = dna.signals - signal_counts.keys()
-        new_signal = self.choice(candidates)
-        signal_counts[new_signal] = signal_counts[update_signal]
-        del signal_counts[update_signal]
-
-    def inc_signal_count(self, signal_counts: dict[Signal, SignalCount]):
-        update_signal = self.choice(signal_counts.keys())
-        signal_counts[update_signal] += self.rand_int(1, self.deviation_weight)
-
-    def dec_signal_count(self, signal_counts: dict[Signal, SignalCount], allow_delete: bool = True):
-        update_signal = self.choice(signal_counts.keys())
-        deviation = self.rand_int(1, self.deviation_weight)
-
-        if deviation < signal_counts[update_signal]:
-            signal_counts[update_signal] -= deviation
-        elif allow_delete:
-            del signal_counts[update_signal]
-        else:
-            signal_counts[update_signal] = 1
-
-
-class SignalsMutagen(Mutagen):
-    def mutate(
-        self,
-        dna: Dna | None = None,
-        num_mutations: int = 1,
-        lesson_plan: LessonPlan | None = None,
-        subject: Any | None = None,
-    ):
-        # only adding signals since removing a signal would require removing it in many places
-        if dna.signals:
-            new_signal = max(dna.signals) + 1
-        else:
-            new_signal = 0
-
-        dna.signals.add(new_signal)
-
-        # an added signal must be used in order for it to have any effect
-
-        # include it in the environment
-        center = self.rand_int(1, self.deviation_weight)
-
-        dna.encoded_environment.append((
-            new_signal,
-            [(center, center)] * dna.num_dimensions,
-            self.rand_int(1, self.deviation_weight),
-        ))
-
-        # include it in the incubation signals
-        dna.incubation_signals[new_signal] = self.rand_int(1, self.deviation_weight)
-
-        # assign affinities
-        if dna.affinities:
-            target_signal = self.choice(dna.affinities.keys())
-            affinity = self.rand_sign() * self.rand_int(1, self.deviation_weight)
-            dna.affinities[target_signal].update({new_signal: affinity})
-
-        source_signal = div(new_signal * self.rand_int(0, len(dna.signals)), len(dna.signals))
-        affinity = self.rand_sign() * self.rand_int(1, self.deviation_weight)
-        dna.affinities[new_signal] = {source_signal: affinity}
-
-
-class IncubationSignalsMutagen(Mutagen, SignalCountsOps):
-    def mutate(
-        self,
-        dna: Dna | None = None,
-        num_mutations: int = 1,
-        lesson_plan: LessonPlan | None = None,
-        subject: Any | None = None,
-    ):
-        base = BASE_WEIGHT
-        add_entry = base if len(dna.incubation_signals) < len(dna.signals) else 0
-        remove_entry = base if dna.incubation_signals else 0
-        change_signal = base if dna.incubation_signals and len(dna.incubation_signals) < len(dna.signals) else 0
-        inc_signal_count = base if dna.incubation_signals else 0
-        dec_signal_count = base if dna.incubation_signals else 0
-
-        weights = [
-            (0, add_entry),
-            (1, remove_entry),
-            (2, change_signal),
-            (3, inc_signal_count),
-            (4, dec_signal_count),
-        ]
-
-        for _ in range(num_mutations):
-            match self.weighted_choice(weights):
-                case 0: self.add_entry(dna, dna.incubation_signals)
-                case 1: self.remove_entry(dna.incubation_signals)
-                case 2: self.change_signal(dna, dna.incubation_signals)
-                case 3: self.inc_signal_count(dna.incubation_signals)
-                case 4: self.dec_signal_count(dna.incubation_signals)
-
-
-class SignalProfileMutagen(Mutagen):
-    def mutate(
-        self,
-        dna: Dna | None = None,
-        num_mutations: int = 1,
-        lesson_plan: LessonPlan | None = None,
-        subject: Any | None = None,
-    ):
-        base = BASE_WEIGHT
-        add_target = base if len(dna.affinities) < len(dna.signals) else 0
-        remove_target = base if dna.affinities else 0
-        change_target = base if dna.affinities and len(dna.affinities) < len(dna.signals) else 0
-
-        if any(len(affinity) < len(dna.signals) for affinity in dna.affinities.values()):
-            add_source = base
-        else:
-            add_source = 0
-
-        remove_source = base if dna.affinities else 0
-        update_source_signal_count = base if dna.affinities else 0
-
-        weights = [
-            (0, add_target),
-            (1, remove_target),
-            (2, change_target),
-            (3, add_source),
-            (4, remove_source),
-            (5, update_source_signal_count),
-        ]
-
-        for _ in range(num_mutations):
-            match self.weighted_choice(weights):
-                case 0: self.add_target(dna)
-                case 1: self.remove_target(dna)
-                case 2: self.change_target(dna)
-                case 3: self.add_source(dna)
-                case 4: self.remove_source(dna)
-                case 5: self.update_source_signal_count(dna)
-                case _: print(f"{self.__class__.__name__} failed to select a mutation")
-
-    def add_target(self, dna: Dna):
-        new_target = self.choice(dna.signals - dna.affinities.keys())
-        new_source = self.choice(dna.signals)
-        dna.affinities[new_target] = {new_source: self.rand_sign() * self.rand_int(1, self.deviation_weight)}
-
-    def remove_target(self, dna: Dna):
-        del dna.affinities[self.choice(dna.affinities.keys())]
-
-    def change_target(self, dna: Dna):
-        update_target = self.choice(dna.affinities.keys())
-        new_target = self.choice(dna.signals - dna.affinities.keys())
-        dna.affinities[new_target] = dna.affinities[update_target]
-        del dna.affinities[update_target]
-
-    def add_source(self, dna: Dna):
-        update_sources = self.choice(
-            affinity
-            for affinity in dna.affinities.values()
-            if len(affinity) < len(dna.signals)
-        )
-
-        new_source = self.choice(dna.signals - update_sources.keys())
-        update_sources[new_source] = self.rand_sign() * self.rand_int(1, self.deviation_weight)
-
-    def remove_source(self, dna: Dna):
-        update_target = self.choice(dna.affinities.keys())
-        update_sources = dna.affinities[update_target]
-
-        if len(update_sources) > 1:
-            # remove a random source if there will still be some sources
-            del update_sources[self.choice(update_sources.keys())]
-        else:
-            # remove the target if it would otherwise end up with no sources
-            del dna.affinities[update_target]
-
-    def update_source_signal_count(self, dna: Dna):
-        update_target = self.choice(dna.affinities.keys())
-        update_sources = dna.affinities[update_target]
-        update_source = self.choice(update_sources.keys())
-        deviation = self.rand_sign() * self.rand_int(1, self.deviation_weight)
-
-        if deviation != -update_sources[update_source]:
-            update_sources[update_source] += deviation
-        elif len(update_sources) > 1:
-            # remove a random source if there will still be some sources
-            del update_sources[update_source]
-        else:
-            # remove the target if it would otherwise end up with no sources
-            del dna.affinities[update_target]
-
-
-class AxonSignalsMutagen(Mutagen, SignalCountsOps):
-    def mutate(
-        self,
-        dna: Dna | None = None,
-        num_mutations: int = 1,
-        lesson_plan: LessonPlan | None = None,
-        subject: Any | None = None,
-    ):
-        assert isinstance(subject, Fate)
-
-        base = BASE_WEIGHT
-        add_entry = base if len(subject.axon_signals) < len(dna.signals) else 0
-        remove_entry = base if len(subject.axon_signals) > 1 else 0
-        change_signal = base if subject.axon_signals and len(subject.axon_signals) < len(dna.signals) else 0
-        inc_signal_count = base if subject.axon_signals else 0
-        dec_signal_count = base if subject.axon_signals else 0
-
-        weights = [
-            (0, lesson_plan[Lesson.MORE_AXON_MOVEMENT](add_entry)),
-            (1, lesson_plan[Lesson.LESS_AXON_MOVEMENT](remove_entry)),
-            (2, change_signal),
-            (3, lesson_plan[Lesson.MORE_AXON_MOVEMENT](inc_signal_count)),
-            (4, lesson_plan[Lesson.LESS_AXON_MOVEMENT](dec_signal_count)),
-        ]
-
-        match self.weighted_choice(weights):
-            case 0: self.add_entry(dna, subject.axon_signals)
-            case 1: self.remove_entry(subject.axon_signals)
-            case 2: self.change_signal(dna, subject.axon_signals)
-            case 3: self.inc_signal_count(subject.axon_signals)
-            case 4: self.dec_signal_count(subject.axon_signals, allow_delete=False)
-            case _: print(f"{self.__class__.__name__} failed to select a mutation")
-
-
-class StimulationMutagen(Mutagen, SignalCountsOps):
+class StimulationMutagen(Mutagen):
     def __init__(
         self,
         deviation_weight: int = 1,
@@ -490,15 +380,15 @@ class StimulationMutagen(Mutagen, SignalCountsOps):
         lesson_plan: LessonPlan | None = None,
         subject: Any | None = None,
     ):
-        assert isinstance(subject, Fate)
+        assert isinstance(subject, Stimulation)
 
-        base = BASE_WEIGHT
-        inc_amount = base
-        dec_amount = base
-        inc_restore_rate = base
-        dec_restore_rate = base
-        inc_restore_damper = base
-        dec_restore_damper = base
+        base_weight = BASE_WEIGHT
+        inc_amount = base_weight
+        dec_amount = base_weight
+        inc_restore_rate = base_weight
+        dec_restore_rate = base_weight
+        inc_restore_damper = base_weight
+        dec_restore_damper = base_weight
 
         weights = [
             (0, lesson_plan[Lesson.LESS_ACTIVATION](inc_amount)),
@@ -510,13 +400,13 @@ class StimulationMutagen(Mutagen, SignalCountsOps):
         ]
 
         match self.weighted_choice(weights):
-            case 0: self.inc_amount(subject.stimulation)
-            case 1: self.dec_amount(subject.stimulation)
-            case 2: self.inc_restore_rate(subject.stimulation)
-            case 3: self.dec_restore_rate(subject.stimulation)
-            case 4: self.inc_restore_damper(subject.stimulation)
-            case 5: self.dec_restore_damper(subject.stimulation)
-            case _: print(f"{self.__class__.__name__} failed to select a mutation")
+            case 0: self.inc_amount(subject)
+            case 1: self.dec_amount(subject)
+            case 2: self.inc_restore_rate(subject)
+            case 3: self.dec_restore_rate(subject)
+            case 4: self.inc_restore_damper(subject)
+            case 5: self.dec_restore_damper(subject)
+            case _: print(f'{self.__class__.__name__} failed to select a mutation')
 
     def inc_amount(self, stimulation: Stimulation):
         stimulation.amount = self.amount.add(stimulation.amount)
@@ -539,7 +429,7 @@ class StimulationMutagen(Mutagen, SignalCountsOps):
         stimulation.snap_back.restore_damper = self.restore_damper.sub(stimulation.snap_back.restore_damper)
 
 
-class TetanicPeriodMutagen(Mutagen, SignalCountsOps):
+class TetanicPeriodMutagen(Mutagen):
     def __init__(
         self,
         deviation_weight: int = 1,
@@ -559,16 +449,16 @@ class TetanicPeriodMutagen(Mutagen, SignalCountsOps):
         lesson_plan: LessonPlan | None = None,
         subject: Any | None = None,
     ):
-        assert isinstance(subject, Fate)
+        assert isinstance(subject, TetanicPeriod)
 
-        base = BASE_WEIGHT
-        flip_enabled = base
-        inc_threshold = base
-        dec_threshold = base
-        inc_activations = base
-        dec_activations = base
-        inc_gap = base
-        dec_gap = base
+        base_weight = BASE_WEIGHT
+        flip_enabled = div(base_weight, 4)
+        inc_threshold = base_weight
+        dec_threshold = base_weight
+        inc_activations = base_weight
+        dec_activations = base_weight
+        inc_gap = base_weight
+        dec_gap = base_weight
 
         weights = [
             (0, flip_enabled),
@@ -581,14 +471,14 @@ class TetanicPeriodMutagen(Mutagen, SignalCountsOps):
         ]
 
         match self.weighted_choice(weights):
-            case 0: self.flip_enabled(subject.tetanic_period)
-            case 1: self.inc_threshold(subject.tetanic_period)
-            case 2: self.dec_threshold(subject.tetanic_period)
-            case 3: self.inc_activations(subject.tetanic_period)
-            case 4: self.dec_activations(subject.tetanic_period)
-            case 5: self.inc_gap(subject.tetanic_period)
-            case 6: self.dec_gap(subject.tetanic_period)
-            case _: print(f"{self.__class__.__name__} failed to select a mutation")
+            case 0: self.flip_enabled(subject)
+            case 1: self.inc_threshold(subject)
+            case 2: self.dec_threshold(subject)
+            case 3: self.inc_activations(subject)
+            case 4: self.dec_activations(subject)
+            case 5: self.inc_gap(subject)
+            case 6: self.dec_gap(subject)
+            case _: print(f'{self.__class__.__name__} failed to select a mutation')
 
     def flip_enabled(self, tetanic_period: TetanicPeriod):
         tetanic_period.enabled = not tetanic_period.enabled
@@ -612,11 +502,300 @@ class TetanicPeriodMutagen(Mutagen, SignalCountsOps):
         tetanic_period.gap = self.gap.sub(tetanic_period.gap)
 
 
-class FateMutagen(Mutagen, SignalCountsOps):
+class ModuloFillMutagen(Mutagen, IntOps):
+    def __init__(self, deviation_weight: int = 1):
+        Mutagen.__init__(self, deviation_weight=deviation_weight)
+        IntOps.__init__(self)
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        assert isinstance(subject, ModuloFill)
+
+        base_weight = BASE_WEIGHT
+        divisor = base_weight
+        remainder = base_weight
+
+        weights = [
+            (0, divisor),
+            (1, remainder),
+        ]
+
+        for _ in range(num_mutations):
+            match self.weighted_choice(weights):
+                case 0: self.update_divisor(dna, subject)
+                case 1: self.update_remainder(subject)
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
+
+    def update_divisor(self, dna: Dna, fill: ModuloFill):
+        min_value = max(2, fill.remainder + 1)
+        max_value = dna.num_neurons
+        fill.divisor = self.update_int(fill.divisor, min_value=min_value, max_value=max_value)
+
+    def update_remainder(self, fill: ModuloFill):
+        min_value = 0
+        max_value = fill.divisor - 1
+        fill.remainder = self.update_int(fill.remainder, min_value=min_value, max_value=max_value)
+
+
+class OffsetFillMutagen(Mutagen, IntOps, TupleIntOps):
+    def __init__(self, deviation_weight: int = 1):
+        Mutagen.__init__(self, deviation_weight=deviation_weight)
+        IntOps.__init__(self)
+        TupleIntOps.__init__(self)
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        assert isinstance(subject, OffsetFill)
+
+        base_weight = BASE_WEIGHT
+        base = base_weight
+        offsets = base_weight
+
+        weights = [
+            (0, base),
+            (1, offsets),
+        ]
+
+        for _ in range(num_mutations):
+            match self.weighted_choice(weights):
+                case 0: self.update_base(dna, subject)
+                case 1: self.update_offsets(dna, subject)
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
+
+    def update_base(self, dna: Dna, fill: OffsetFill):
+        min_value = 0
+        max_value = dna.dimension_size - 1
+        fill.base = self.update_tuple_int(fill.base, min_value=min_value, max_value=max_value)
+
+    def update_offsets(self, dna: Dna, fill: OffsetFill):
+        min_value = 0
+        max_value = dna.dimension_size - 1
+        fill.offsets = self.update_tuple_int(fill.offsets, min_value=min_value, max_value=max_value)
+
+
+class FillMutagen(Mutagen):
     def __init__(
         self,
         deviation_weight: int = 1,
-        axon_signals: AxonSignalsMutagen | None = None,
+        modulo_fill: ModuloFillMutagen | None = None,
+        offset_fill: OffsetFillMutagen | None = None,
+    ):
+        Mutagen.__init__(self, deviation_weight=deviation_weight)
+        self.modulo_fill = modulo_fill or ModuloFillMutagen()
+        self.offset_fill = offset_fill or OffsetFillMutagen()
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        if isinstance(subject, CompleteFill):
+            raise RuntimeError(f'should not have mutated with a CompleteFill which has no mutable fields')
+        elif isinstance(subject, ModuloFill):
+            self.modulo_fill.mutate(dna, num_mutations, lesson_plan, subject)
+        elif isinstance(subject, OffsetFill):
+            self.offset_fill.mutate(dna, num_mutations, lesson_plan, subject)
+        else:
+            raise ValueError(f'Expected Fill: {subject}')
+
+
+class FillShapeMutagen(Mutagen):
+    def __init__(
+        self,
+        deviation_weight: int = 1,
+        fill: FillMutagen | None = None,
+    ):
+        Mutagen.__init__(self, deviation_weight=deviation_weight)
+        self.fill = fill or FillMutagen()
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        assert isinstance(subject, FillShape)
+
+        base_weight = BASE_WEIGHT
+        flip_outline = div(base_weight, 4)
+        update_fill = base_weight if not isinstance(subject.fill, CompleteFill) else 0
+
+        weights = [
+            (0, flip_outline),
+            (1, update_fill),
+        ]
+
+        for _ in range(num_mutations):
+            match self.weighted_choice(weights):
+                case 0: self.flip_outline(subject)
+                case 1: self.fill.mutate(dna=dna, lesson_plan=lesson_plan, subject=subject.fill)
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
+
+    def flip_outline(self, subject: FillShape):
+        subject.outline = not subject.outline
+
+
+class RectangleShapeMutagen(Mutagen, TupleIntOps):
+    def __init__(
+        self,
+        deviation_weight: int = 1,
+        center: PositionMutagen | None = None,
+        fill: FillMutagen | None = None,
+    ):
+        Mutagen.__init__(self, deviation_weight=deviation_weight)
+        TupleIntOps.__init__(self)
+        self.center = center or PositionMutagen()
+        self.fill = fill or FillMutagen()
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        assert isinstance(subject, RectangleShape)
+
+        base_weight = BASE_WEIGHT
+        update_center = base_weight
+        update_sizes = base_weight
+        flip_outline = div(base_weight, 4)
+        flip_wrap = div(base_weight, 4)
+        update_fill = base_weight if not isinstance(subject.fill, CompleteFill) else 0
+
+        weights = [
+            (0, update_center),
+            (1, update_sizes),
+            (2, flip_outline),
+            (3, flip_wrap),
+            (4, update_fill),
+        ]
+
+        for _ in range(num_mutations):
+            match self.weighted_choice(weights):
+                case 0: self.center.mutate(dna=dna, lesson_plan=lesson_plan, subject=subject.center)
+                case 1: self.update_sizes(dna, subject)
+                case 2: self.flip_outline(subject)
+                case 3: self.flip_wrap(subject)
+                case 4: self.fill.mutate(dna=dna, lesson_plan=lesson_plan, subject=subject.fill)
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
+
+    def update_sizes(self, dna: Dna, subject: RectangleShape):
+        min_value = 0
+        max_value = dna.dimension_size
+        subject.sizes = self.update_tuple_int(subject.sizes, min_value=min_value, max_value=max_value)
+
+    def flip_outline(self, subject: RectangleShape):
+        subject.outline = not subject.outline
+
+    def flip_wrap(self, subject: RectangleShape):
+        subject.wrap = not subject.wrap
+
+
+class CityShapeMutagen(Mutagen, IntOps):
+    def __init__(
+        self,
+        deviation_weight: int = 1,
+        center: PositionMutagen | None = None,
+        fill: FillMutagen | None = None,
+    ):
+        Mutagen.__init__(self, deviation_weight=deviation_weight)
+        IntOps.__init__(self)
+        self.center = center or PositionMutagen()
+        self.fill = fill or FillMutagen()
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        assert isinstance(subject, CityShape)
+
+        base_weight = BASE_WEIGHT
+        update_center = base_weight
+        update_size = base_weight
+        flip_outline = div(base_weight, 4)
+        flip_wrap = div(base_weight, 4)
+        update_fill = base_weight if not isinstance(subject.fill, CompleteFill) else 0
+
+        weights = [
+            (0, update_center),
+            (1, update_size),
+            (2, flip_outline),
+            (3, flip_wrap),
+            (4, update_fill),
+        ]
+
+        for _ in range(num_mutations):
+            match self.weighted_choice(weights):
+                case 0: self.center.mutate(dna=dna, lesson_plan=lesson_plan, subject=subject.center)
+                case 1: self.update_size(dna, subject)
+                case 2: self.flip_outline(subject)
+                case 3: self.flip_wrap(subject)
+                case 4: self.fill.mutate(dna=dna, lesson_plan=lesson_plan, subject=subject.fill)
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
+
+    def update_size(self, dna: Dna, subject: CityShape):
+        min_value = 1
+        max_value = div(dna.dimension_size + 1, 2)
+        subject.size = self.update_int(subject.size, min_value=min_value, max_value=max_value)
+
+    def flip_outline(self, subject: CityShape):
+        subject.outline = not subject.outline
+
+    def flip_wrap(self, subject: CityShape):
+        subject.wrap = not subject.wrap
+
+
+class ShapeMutagen(Mutagen):
+    def __init__(
+        self,
+        deviation_weight: int = 1,
+        fill_shape: FillShapeMutagen | None = None,
+        rectangle_shape: RectangleShapeMutagen | None = None,
+        city_shape: CityShapeMutagen | None = None,
+    ):
+        Mutagen.__init__(self, deviation_weight=deviation_weight)
+        self.fill_shape = fill_shape or FillShapeMutagen()
+        self.rectangle_shape = rectangle_shape or RectangleShapeMutagen()
+        self.city_shape = city_shape or CityShapeMutagen()
+
+    def mutate(
+        self,
+        dna: Dna | None = None,
+        num_mutations: int = 1,
+        lesson_plan: LessonPlan | None = None,
+        subject: Any | None = None,
+    ):
+        if isinstance(subject, FillShape):
+            self.fill_shape.mutate(dna, num_mutations, lesson_plan, subject)
+        elif isinstance(subject, RectangleShape):
+            self.rectangle_shape.mutate(dna, num_mutations, lesson_plan, subject)
+        elif isinstance(subject, CityShape):
+            self.city_shape.mutate(dna, num_mutations, lesson_plan, subject)
+        else:
+            raise ValueError(f'Expected Shape: {subject}')
+
+
+class FateMutagen(Mutagen, TupleIntOps):
+    def __init__(
+        self,
+        deviation_weight: int = 1,
         activation_level: IntOps | None = None,
         refactory_period: IntOps | None = None,
         stimulation: StimulationMutagen | None = None,
@@ -624,7 +803,7 @@ class FateMutagen(Mutagen, SignalCountsOps):
         tetanic_period: TetanicPeriodMutagen | None = None,
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
-        self.axon_signals = axon_signals or AxonSignalsMutagen()
+        TupleIntOps.__init__(self)
         self.activation_level = activation_level or IntOps(min_value=1)
         self.refactory_period = refactory_period or IntOps(min_value=0)
         self.stimulation = stimulation or StimulationMutagen()
@@ -640,18 +819,18 @@ class FateMutagen(Mutagen, SignalCountsOps):
     ):
         assert isinstance(subject, Fate)
 
-        base = BASE_WEIGHT
-        flip_excites = base
-        update_axon_signals = base if dna.signals else 0
-        update_activation_level = base
-        update_refactory_period = base
-        update_stimulation = base
-        update_overstimulation_threshold = base
-        update_tetanic_period = base
+        base_weight = BASE_WEIGHT
+        flip_excites = div(base_weight, 4)
+        update_axon_offset = base_weight
+        update_activation_level = base_weight
+        update_refactory_period = base_weight
+        update_stimulation = base_weight
+        update_overstimulation_threshold = base_weight
+        update_tetanic_period = base_weight
 
         weights = [
             (0, flip_excites),
-            (1, update_axon_signals),
+            (1, lesson_plan[(Lesson.MORE_AXON_MOVEMENT, Lesson.LESS_AXON_MOVEMENT)](update_axon_offset)),
             (2, update_activation_level),
             (3, update_refactory_period),
             (4, update_stimulation),
@@ -662,16 +841,21 @@ class FateMutagen(Mutagen, SignalCountsOps):
         for _ in range(num_mutations):
             match self.weighted_choice(weights):
                 case 0: self.flip_excites(subject)
-                case 1: self.axon_signals.mutate(dna, lesson_plan=lesson_plan, subject=subject)
+                case 1: self.update_axon_offset(dna, subject)
                 case 2: self.update_activation_level(subject)
                 case 3: self.update_refactory_period(subject)
-                case 4: self.stimulation.mutate(lesson_plan=lesson_plan, subject=subject)
+                case 4: self.stimulation.mutate(lesson_plan=lesson_plan, subject=subject.stimulation)
                 case 5: self.update_overstimulation_threshold(subject)
-                case 6: self.tetanic_period.mutate(lesson_plan=lesson_plan, subject=subject)
-                case _: print(f"{self.__class__.__name__} failed to select a mutation")
+                case 6: self.tetanic_period.mutate(lesson_plan=lesson_plan, subject=subject.tetanic_period)
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
 
     def flip_excites(self, fate: Fate):
         fate.excites = not fate.excites
+
+    def update_axon_offset(self, dna: Dna, fate: Fate):
+        min_value = -(dna.dimension_size - 1)
+        max_value = dna.dimension_size - 1
+        fate.axon_offset = self.update_tuple_int(fate.axon_offset, min_value=min_value, max_value=max_value)
 
     def update_activation_level(self, fate: Fate):
         fate.activation_level = self.activation_level.update_int(fate.activation_level)
@@ -683,154 +867,19 @@ class FateMutagen(Mutagen, SignalCountsOps):
         fate.overstimulation_threshold = self.activation_level.update_int(fate.overstimulation_threshold)
 
 
-class BinaryFateMutagen(Mutagen):
-    def mutate(
-        self,
-        dna: Dna | None = None,
-        num_mutations: int = 1,
-        lesson_plan: LessonPlan | None = None,
-        subject: Any | None = None,
-    ):
-        assert isinstance(subject, BinaryFate)
-
-        base = BASE_WEIGHT
-        add_entry = base if len(subject.is_left) < 2 * len(dna.signals) else 0
-        remove_entry = base if len(subject.is_left) > 1 else 0
-        change_signal = base if subject.is_left else 0
-        flip_is_lower = base if subject.is_left else 0
-        inc_threshold = base if subject.is_left else 0
-        dec_threshold = base if subject.is_left else 0
-
-        weights = [
-            (0, add_entry),
-            (1, remove_entry),
-            (2, change_signal),
-            (3, flip_is_lower),
-            (4, inc_threshold),
-            (5, dec_threshold),
-        ]
-
-        for _ in range(num_mutations):
-            match self.weighted_choice(weights):
-                case 0: self.add_entry(dna, subject.is_left)
-                case 1: self.remove_entry(subject.is_left)
-                case 2: self.change_signal(dna, subject.is_left)
-                case 3: self.flip_is_lower(subject.is_left)
-                case 4: self.inc_threshold(subject.is_left)
-                case 5: self.dec_threshold(subject.is_left)
-                case _: print(f"{self.__class__.__name__} failed to select a mutation")
-
-    def add_entry(self, dna: Dna, is_left: IsLeft):
-        all_candidates = {(signal, is_lower) for signal in dna.signals for is_lower in (False, True)}
-        remaining_candidates = all_candidates - {(signal, is_lower) for signal, is_lower, _ in is_left}
-        selected_signal, selected_is_lower = self.choice(remaining_candidates)
-
-        # if the same signal already exists, ensure the new constraint is compatible with the existing constraint
-        for signal, is_lower, threshold in is_left:
-            if signal == selected_signal:
-                if is_lower:
-                    # the new threshold must be <= the existing one
-                    selected_threshold = self.rand_int(0, threshold)
-                else:
-                    # the new threshold must be >= the existing one
-                    selected_threshold = self.rand_int(threshold, threshold + self.deviation_weight)
-
-                break
-        else:
-            # the same signal does not exist
-            selected_threshold = self.rand_int(0, self.deviation_weight)
-
-        is_left.append((selected_signal, selected_is_lower, selected_threshold))
-
-    def remove_entry(self, is_left: IsLeft):
-        del is_left[self.rand_int(0, len(is_left) - 1)]
-
-    def change_signal(self, dna: Dna, is_left: IsLeft):
-        update_idx = self.rand_int(0, len(is_left) - 1)
-        update_signal, update_is_lower, update_threshold = is_left[update_idx]
-        new_signal = self.choice(dna.signals - {update_signal})
-        is_left[update_idx] = new_signal, update_is_lower, update_threshold
-        deletions: list[int] = []
-
-        # 1. delete the existing signal with the same is_lower if the new constraint is more restrictive
-        #      otherwise, delete the row to be updated since it is superfluous
-        #    ---|>------<|--- start
-        #    ---|>--|>--<|--- add new constraint
-        #    -------|>--<|--- drop unnecessary constraint
-        #
-        #    ---|>------<|--- start
-        #    |>-|>------<|--- add new constraint
-        #    ---|>------<|--- new constraint was the unnecessary one
-        #
-        # 2. delete the existing signal with the opposite is_lower if the new constraint is incompatible
-        #    ---|>------<|--- start
-        #    ---|>------<|-|> add new constraint
-        #    ---|>---------|> drop unnecessary constraint
-        #    --------------|> later: drop other unnecessary constraint
-        if update_is_lower:
-            for idx, (signal, is_lower, threshold) in enumerate(is_left):
-                if idx != update_idx and signal == new_signal:
-                    if threshold > update_threshold:
-                        deletions.append(idx)
-                    elif is_lower is update_is_lower:
-                        deletions.append(update_idx)
-                        break
-        else:
-            for idx, (signal, is_lower, threshold) in enumerate(is_left):
-                if idx != update_idx and signal == new_signal:
-                    if threshold < update_threshold:
-                        deletions.append(idx)
-                    elif is_lower is update_is_lower:
-                        deletions.append(update_idx)
-                        break
-
-        deletions.sort(reverse=True)
-
-        for idx in deletions:
-            del is_left[idx]
-
-    def flip_is_lower(self, is_left: IsLeft):
-        update_idx = self.rand_int(0, len(is_left) - 1)
-        update_signal, update_is_lower, update_threshold = is_left[update_idx]
-        is_left[update_idx] = update_signal, not update_is_lower, update_threshold
-
-        # flipping one makes the other constraint on the same signal superfluous
-        # ---|>------<|--- start
-        # ---|>-------|>-- split one of the constraints
-        # ------------|>-- drop unnecessary constraint
-        for idx, (signal, _, _) in enumerate(is_left):
-            if signal == update_signal and idx != update_idx:
-                del is_left[idx]
-                break
-            
-
-    def inc_threshold(self, is_left: IsLeft):
-        update_idx = self.rand_int(0, len(is_left) - 1)
-        signal, is_lower, threshold = is_left[update_idx]
-        is_left[update_idx] = signal, is_lower, threshold + self.rand_int(1, self.deviation_weight)
-
-    def dec_threshold(self, is_left: IsLeft):
-        update_idx = self.rand_int(0, len(is_left) - 1)
-        update_signal, update_is_lower, update_threshold = is_left[update_idx]
-        deviation = self.rand_int(1, self.deviation_weight)
-
-        # <= in this case because 0 is valid, but -1 is not
-        if deviation <= update_threshold:
-            is_left[update_idx] = update_signal, update_is_lower, update_threshold - deviation
-        else:
-            del is_left[update_idx]
-
-
-class FateTreeMutagen(Mutagen):
+class FatePaintsMutagen(Mutagen):
     def __init__(
         self,
         deviation_weight: int = 1,
+        paint: ShapeMutagen | None = None,
         fate: FateMutagen | None = None,
-        binary_fate: BinaryFateMutagen | None = None,
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
+        self.paint = paint or ShapeMutagen()
         self.fate = fate or FateMutagen()
-        self.binary_fate = binary_fate or BinaryFateMutagen()
+
+        self.paint.deviation_weight = deviation_weight
+        self.fate.deviation_weight = deviation_weight
 
     def mutate(
         self,
@@ -839,92 +888,88 @@ class FateTreeMutagen(Mutagen):
         lesson_plan: LessonPlan | None = None,
         subject: Any | None = None,
     ):
-        base = BASE_WEIGHT
-        add_fate = base if dna.signals else 0
-        remove_fate = base if len(tuple(iter(dna.fate_tree))) > 1 else 0
-        update_fate = base
-        update_binary_fate = base if len(tuple(dna.fate_tree.branches_iter())) > 0 else 0
+        base_weight = BASE_WEIGHT
+        add = base_weight
+        remove = base_weight if len(dna.fate_paints) >= 2 else 0
+        swap = (base_weight * 2) if len(dna.fate_paints) >= 3 else 0
+        update_paint = (base_weight * 4) if len(dna.fate_paints) >= 2 else 0
+        update_fate = (base_weight * 4)
+        replace_paint = base_weight if len(dna.fate_paints) >= 2 else 0
 
         weights = [
-            (0, add_fate),
-            (1, remove_fate),
-            (2, update_fate),
-            (3, update_binary_fate),
+            (0, add),
+            (1, remove),
+            (2, swap),
+            (3, update_paint),
+            (4, lesson_plan[(Lesson.MORE_AXON_MOVEMENT, Lesson.LESS_AXON_MOVEMENT)](update_fate)),
+            (5, replace_paint),
         ]
 
         for _ in range(num_mutations):
             match self.weighted_choice(weights):
-                case 0: self.add_fate(dna)
-                case 1: self.remove_fate(dna)
-                case 2: self.update_fate(dna, lesson_plan)
-                case 3: self.update_binary_fate(dna, lesson_plan)
-                case _: print(f"{self.__class__.__name__} failed to select a mutation")
+                case 0: self.add(dna)
+                case 1: self.remove(dna)
+                case 2: self.swap(dna)
+                case 3: self.update_paint(dna, lesson_plan)
+                case 4: self.update_fate(dna, lesson_plan)
+                case 5: self.replace_paint(dna)
+                case _: print(f'{self.__class__.__name__} failed to select a mutation')
 
-    def add_fate(self, dna: Dna):
-        dna.fate_tree.add(
-            leaf=Fate(
-                excites=True,
-                axon_signals={self.choice(dna.signals): rand_int(1, self.deviation_weight)},
-                activation_level=rand_int(1, self.deviation_weight),
-                refactory_period=rand_int(0, self.deviation_weight),
-                stimulation=Stimulation(
-                    amount=rand_int(1, self.deviation_weight),
-                    snap_back=SnapBack(
-                        baseline=0,
-                        restore_rate=rand_int(1, self.deviation_weight),
-                        restore_damper=1,
-                    ),
-                ),
-                overstimulation_threshold=rand_int(1, self.deviation_weight),
-                tetanic_period=TetanicPeriod(
-                    enabled=self.rand_bool(),
-                    threshold=rand_int(0, self.deviation_weight),
-                    activations=rand_int(1, self.deviation_weight),
-                    gap=rand_int(0, self.deviation_weight),
-                ),
-            ),
-            new_branch=lambda left, right: BinaryFate(left=left, right=right, is_left=[(
-                self.choice(dna.signals),
-                self.rand_bool(),
-                rand_int(0, self.deviation_weight),
-            )]),
-            is_next_left=self.rand_bool,
+    def add(self, dna: Dna):
+        dna.fate_paints.append((
+            random_paint(dna.num_dimensions, dna.dimension_size, self.deviation_weight, self.random),
+            random_fate(dna.num_dimensions, dna.dimension_size, self.deviation_weight, self.random),
+        ))
+
+    def remove(self, dna: Dna):
+        del dna.fate_paints[self.rand_int(1, len(dna.fate_paints) - 1)]
+
+    def swap(self, dna: Dna):
+        idx_a = self.rand_int(1, len(dna.fate_paints) - 1)
+        idx_b = self.rand_int(1, len(dna.fate_paints) - 2)
+
+        # ensure they are not the same
+        if idx_b >= idx_a:
+            idx_b = idx_b + 1
+
+        a = dna.fate_paints[idx_a]
+        dna.fate_paints[idx_a] = dna.fate_paints[idx_b]
+        dna.fate_paints[idx_b] = a
+
+    def update_paint(self, dna: Dna, lesson_plan: LessonPlan):
+        update_idx = self.rand_int(1, len(dna.fate_paints) - 1)
+        paint, fate = dna.fate_paints[update_idx]
+        self.paint.mutate(dna, lesson_plan=lesson_plan, subject=paint)
+
+    def update_fate(self, dna: Dna, lesson_plan: LessonPlan):
+        update_idx = self.rand_int(0, len(dna.fate_paints) - 1)
+        paint, fate = dna.fate_paints[update_idx]
+        self.fate.mutate(dna, lesson_plan=lesson_plan, subject=fate)
+
+    def replace_paint(self, dna: Dna):
+        update_idx = self.rand_int(1, len(dna.fate_paints) - 1)
+        fate = dna.fate_paints[update_idx][1]
+
+        dna.fate_paints[update_idx] = (
+            random_paint(dna.num_dimensions, dna.dimension_size, self.deviation_weight, self.random),
+            fate,
         )
-
-    def remove_fate(self, dna: Dna):
-        dna.fate_tree.remove(self.rand_bool)
-
-    def update_fate(self, dna: Dna, lesson_plan: LessonPlan | None):
-        self.fate.mutate(dna, lesson_plan=lesson_plan, subject=self.choice(iter(dna.fate_tree)))
-
-    def update_binary_fate(self, dna: Dna, lesson_plan: LessonPlan | None):
-        self.binary_fate.mutate(dna, lesson_plan=lesson_plan, subject=self.choice(dna.fate_tree.branches_iter()))
 
 
 class Mutator(Mutagen):
     def __init__(
         self,
         deviation_weight: int = 1,
-        dimension_size: DimensionSizeMutagen | None = None,
         max_synapses: MaxSynapsesMutagen | None = None,
         max_synapse_strength: MaxSynapseStrengthMutagen | None = None,
         max_axon_range: MaxAxonRangeMutagen | None = None,
-        signals: SignalsMutagen | None = None,
-        environment: EnvironmentMutagen | None = None,
-        incubation_signals: IncubationSignalsMutagen | None = None,
-        signal_profile: SignalProfileMutagen | None = None,
-        fate_tree: FateTreeMutagen | None = None,
+        fate_paints: FatePaintsMutagen | None = None,
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
-        self.dimension_size = dimension_size or DimensionSizeMutagen()
-        self.max_synapses = max_synapses or MaxSynapsesMutagen()
-        self.max_synapse_strength = max_synapse_strength or MaxSynapseStrengthMutagen()
-        self.max_axon_range = max_axon_range or MaxAxonRangeMutagen()
-        self.signals = signals or SignalsMutagen()
-        self.environment = environment or EnvironmentMutagen()
-        self.incubation_signals = incubation_signals or IncubationSignalsMutagen()
-        self.signal_profile = signal_profile or SignalProfileMutagen()
-        self.fate_tree = fate_tree or FateTreeMutagen()
+        self.max_synapses = max_synapses or MaxSynapsesMutagen(deviation_weight=deviation_weight)
+        self.max_synapse_strength = max_synapse_strength or MaxSynapseStrengthMutagen(deviation_weight=deviation_weight)
+        self.max_axon_range = max_axon_range or MaxAxonRangeMutagen(deviation_weight=deviation_weight)
+        self.fate_paints = fate_paints or FatePaintsMutagen(deviation_weight=deviation_weight)
 
     def mutate(
         self,
@@ -934,35 +979,17 @@ class Mutator(Mutagen):
         subject: Any | None = None,
     ):
         lesson_plan = lesson_plan or LessonPlan(plan={})
-        base = BASE_WEIGHT
-        dimension_size = 0  # not supporting changes in dimension size yet
-        max_synapses = base
-        max_synapse_strength = base
-        max_axon_range = base
-
-        # since:
-        # - signals are important
-        # - this only adds signals and does not remove them
-        #
-        # begins with a high weight and the weight rapidly decreases to 1 as signals are added
-        signals = div(base * SIGNALS_WEIGHT + len(dna.signals) + 1, len(dna.signals) + 1)
-        signals = signals if len(dna.signals) < MAX_SIGNALS else 0
-
-        environment = base if dna.signals else 0
-        incubation_signals = base if dna.signals else 0
-        signal_profile = base if dna.signals else 0
-        fate_tree = base
+        base_weight = BASE_WEIGHT
+        max_synapses = base_weight
+        max_synapse_strength = base_weight
+        max_axon_range = div(base_weight, 4)
+        fate_paints = base_weight * 16
 
         weights = [
-            (self.dimension_size, dimension_size),
             (self.max_synapses, max_synapses),
             (self.max_synapse_strength, max_synapse_strength),
             (self.max_axon_range, max_axon_range),
-            (self.signals, signals),
-            (self.environment, environment),
-            (self.incubation_signals, incubation_signals),
-            (self.signal_profile, signal_profile),
-            (self.fate_tree, fate_tree),
+            (self.fate_paints, fate_paints),
         ]
 
         for _ in range(num_mutations):

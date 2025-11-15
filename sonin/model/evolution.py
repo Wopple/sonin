@@ -24,8 +24,8 @@ class Coach(HasStep):
     Records metrics for the purpose of producing a final measurement of fitness.
     """
 
-    def __init__(self, mind: MindInterface | None = None):
-        self.mind = mind
+    def __init__(self):
+        self.mind: MindInterface | None = None
         self.done: bool = False
 
     @property
@@ -67,11 +67,10 @@ class Health(Coach):
 
     def __init__(
         self,
-        mind: MindInterface | None = None,
         n_time: int = 0,
         d_time: int = 64,
     ):
-        Coach.__init__(self, mind=mind)
+        Coach.__init__(self)
 
         # time of the next input
         self.n_time = n_time
@@ -121,7 +120,7 @@ class Health(Coach):
 
         if self.previous_activations_set is not None:
             self.activation_variance_miss += sum(
-                bin(a & b).count("1")
+                bin(a & b).count('1')
                 for a, b in zip(activations_set, self.previous_activations_set)
             )
 
@@ -131,9 +130,13 @@ class Health(Coach):
             self.done = True
 
     def measure(self) -> tuple[Fitness, LessonPlan]:
+        # target activations
         target_activations_component = div(self.over_activations + self.under_activations, self.d_time) + 1
+
+        # activation variance
         activation_variance_component = div(self.activation_variance_miss, self.d_time) + 1
 
+        # axon distance
         target_axon_distance_component = div(sum(
             abs(self.mind.mind.dimension_size - n.position.city_distance(n.axon.position))
             for n in self.mind.mind.neurons
@@ -144,17 +147,33 @@ class Health(Coach):
             for _, g in groupby(sorted(n.axon.position.value for n in self.mind.mind.neurons))
         )
 
-        axon_variance_component = abs(self.target_axon_load - max_axons_in_same_position) + 1
+        # axon load
+        axon_load_component = abs(self.target_axon_load - max_axons_in_same_position) + 1
         need_more_axon_movement = max_axons_in_same_position < self.target_axon_load
         need_less_axon_movement = max_axons_in_same_position > self.target_axon_load
+
+        # axon variance
+        relative_values = {}
+
+        for n in self.mind.mind.neurons:
+            relative_value = (n.position - n.axon.position).value
+
+            if relative_value in relative_values:
+                relative_values[relative_value] += 1
+            else:
+                relative_values[relative_value] = 1
+
+        axon_variance_component = max(relative_values.values())
+
+        # activations set
         activations_set_component = max(self.activations_set_counts.values())
 
         lesson_weight, lesson = sorted(
             [
                 (self.under_activations, Lesson.MORE_ACTIVATION),
                 (self.over_activations, Lesson.LESS_ACTIVATION),
-                (axon_variance_component if need_more_axon_movement else 1, Lesson.MORE_AXON_MOVEMENT),
-                (axon_variance_component if need_less_axon_movement else 1, Lesson.LESS_AXON_MOVEMENT),
+                (axon_load_component if need_more_axon_movement else 1, Lesson.MORE_AXON_MOVEMENT),
+                (axon_load_component if need_less_axon_movement else 1, Lesson.LESS_AXON_MOVEMENT),
             ],
             reverse=True,
         )[0]
@@ -162,7 +181,8 @@ class Health(Coach):
         return (
             target_activations_component ** 1
             * activation_variance_component ** 1
-            * target_axon_distance_component ** 8
+            * target_axon_distance_component ** 1
+            * axon_load_component ** 1
             * axon_variance_component ** 1
             * activations_set_component ** 1,
             LessonPlan(plan={lesson: Gear(up=lesson_weight)}),
