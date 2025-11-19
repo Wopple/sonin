@@ -4,7 +4,7 @@ from datetime import timedelta
 from functools import cached_property
 from itertools import groupby
 from math import prod
-from typing import Any, Self
+from typing import Self
 
 from pydantic import BaseModel
 
@@ -125,19 +125,9 @@ class Health(Coach):
         self.activations_set_counts: dict[tuple[int, ...], int] = {}
         self.previous_activations_set: tuple[int, ...] | None = None
 
-    # Approximated by ln(x) / ln(ln(x))
     @property
     def target_axon_load(self) -> int:
-        num_neurons = self.num_neurons
-
-        if num_neurons < 743:
-            return 3
-        elif num_neurons < 41831:
-            return 4
-        elif num_neurons < 2764920:
-            return 5
-        else:
-            return 6
+        return self.dimension_size
 
     def post_step(self, c_time: int):
         # target partial activity to avoid too much and too little activity
@@ -176,20 +166,29 @@ class Health(Coach):
         activation_variance_component = div(self.activation_variance_miss, self.d_time) + 1
 
         # axon distance
-        target_axon_distance_component = div(sum(
-            abs(self.mind.mind.dimension_size - n.position.city_distance(n.axon.position))
-            for n in self.mind.mind.neurons
-        ), len(self.mind.mind.neurons.items)) + 1
+        axons_over_distance = 0
+        axons_under_distance = 0
 
+        for n in self.mind.mind.neurons:
+            distance_diff = self.mind.mind.dimension_size - n.position.city_distance(n.axon.position)
+
+            if distance_diff > 0:
+                axons_over_distance += distance_diff
+            elif distance_diff < 0:
+                axons_under_distance += -distance_diff
+
+        target_axon_distance_component = div(
+            axons_over_distance + axons_under_distance,
+            len(self.mind.mind.neurons.items)
+        ) + 1
+
+        # axon load
         max_axons_in_same_position = max(
             len(list(g))
             for _, g in groupby(sorted(n.axon.position.value for n in self.mind.mind.neurons))
         )
 
-        # axon load
         axon_load_component = abs(self.target_axon_load - max_axons_in_same_position) + 1
-        need_more_axon_movement = max_axons_in_same_position < self.target_axon_load
-        need_less_axon_movement = max_axons_in_same_position > self.target_axon_load
 
         # axon variance
         relative_values = {}
@@ -207,27 +206,30 @@ class Health(Coach):
         # activations set
         activations_set_component = max(self.activations_set_counts.values())
 
-        lesson_weight, lesson = sorted(
-            [
-                (self.under_activations, Lesson.MORE_ACTIVATION),
-                (self.over_activations, Lesson.LESS_ACTIVATION),
-                (axon_load_component if need_more_axon_movement else 1, Lesson.MORE_AXON_MOVEMENT),
-                (axon_load_component if need_less_axon_movement else 1, Lesson.LESS_AXON_MOVEMENT),
-            ],
-            reverse=True,
-        )[0]
-
-        return (
-            (
-                target_activations_component,
-                activation_variance_component,
-                target_axon_distance_component,
-                axon_load_component,
-                axon_variance_component,
-                activations_set_component,
-            ),
-            LessonPlan(plan={lesson: Gear(up=lesson_weight)}),
+        measurements = (
+            target_activations_component,
+            activation_variance_component,
+            target_axon_distance_component,
+            axon_load_component,
+            axon_variance_component,
+            activations_set_component,
         )
+
+        need_more_axon_movement = False
+        need_less_axon_movement = False
+
+        if target_axon_distance_component > min(measurements) * 2:
+            if axons_over_distance >= axons_under_distance:
+                need_more_axon_movement = True
+            else:
+                need_less_axon_movement = True
+
+        plan = {
+            Lesson.MORE_AXON_MOVEMENT: Gear(up=target_axon_distance_component if need_more_axon_movement else 1),
+            Lesson.LESS_AXON_MOVEMENT: Gear(up=target_axon_distance_component if need_less_axon_movement else 1),
+        }
+
+        return measurements, LessonPlan(plan=plan)
 
     def reset(self):
         super().reset()

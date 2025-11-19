@@ -233,8 +233,8 @@ if __name__ == '__main__':
     seed(1)
     name = '1'
 
-    samples = [Dna.from_defaults()]
-    # samples = load_samples_local(name)
+    # samples = [Dna.from_defaults()]
+    samples = load_samples_local(name)
 
-    evolve(samples, name, 32, timedelta(minutes=60))
-    # run_and_plot(samples[0])
+    # evolve(samples, name, 32, timedelta(minutes=15))
+    run_and_plot(samples[0])

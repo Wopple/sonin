@@ -1,6 +1,6 @@
 from pytest import mark
 
-from sonin.model.metric import FrequencyProfile
+from sonin.model.metric import SlidingFrequencyProfile
 
 
 @mark.parametrize(
@@ -19,8 +19,8 @@ from sonin.model.metric import FrequencyProfile
         (2, [1, 2, 3, 8], 3),
     ],
 )
-def test_frequency_mean(size: int, c_times: list[int], expected: int):
-    frequency = FrequencyProfile(size)
+def test_sliding_frequency_mean(size: int, c_times: list[int], expected: int):
+    frequency = SlidingFrequencyProfile(size)
 
     for c_time in c_times:
         frequency.record(c_time)
@@ -46,8 +46,8 @@ def test_frequency_mean(size: int, c_times: list[int], expected: int):
         (2, [1, 2, 3, 10], 6),
     ],
 )
-def test_frequency_instability(size: int, c_times: list[int], expected: int):
-    frequency = FrequencyProfile(size)
+def test_sliding_frequency_instability(size: int, c_times: list[int], expected: int):
+    frequency = SlidingFrequencyProfile(size)
 
     for c_time in c_times:
         frequency.record(c_time)

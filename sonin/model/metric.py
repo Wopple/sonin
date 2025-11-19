@@ -2,7 +2,7 @@
 from sonin.sonin_math import div
 
 
-class FrequencyProfile:
+class SlidingFrequencyProfile:
     """
     Records a sliding window of the elapsed time since the last record based on the c_time of the events. Calculates
     metrics related to the frequency of events.
