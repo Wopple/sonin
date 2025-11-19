@@ -12,3 +12,12 @@ def div(a: int, b: int) -> int:
         return result + 1
     else:
         return result
+
+
+def most_significant_bit(n: int) -> int:
+    idx = 0
+
+    while 1 << idx <= n:
+        idx += 1
+
+    return idx

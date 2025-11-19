@@ -135,13 +135,13 @@ class Mind(BaseModel, HasRandom, HasStep):
         # This makes the algorithm trivial to parallelize at a later time.
 
         for idx, n in enumerate(self.neurons):
-            previous_activated = n.activated
+            input_activated = n.activated
             n.step(c_time)
 
             if idx % 64 == 0:
                 self.activation_set.append(0)
 
-            if (not previous_activated) and n.activated:
+            if (not input_activated) and n.activated:
                 self.num_activations += 1
                 self.activation_set[-1] |= 1 << (idx % 64)
 

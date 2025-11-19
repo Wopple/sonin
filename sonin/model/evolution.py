@@ -1,7 +1,12 @@
 import heapq
 import time
 from datetime import timedelta
+from functools import cached_property
 from itertools import groupby
+from math import prod
+from typing import Any, Self
+
+from pydantic import BaseModel
 
 from sonin.model.dna import Dna
 from sonin.model.gear import Gear
@@ -9,12 +14,46 @@ from sonin.model.lesson import Lesson, LessonPlan
 from sonin.model.mind import MindInterface
 from sonin.model.mutation import Mutator
 from sonin.model.step import HasStep
-from sonin.sonin_math import div
+from sonin.sonin_math import div, most_significant_bit
 from sonin.sonin_random import HasRandom
 
-# 1 is maximum fitness, larger numbers have lower fitness. 1 is used instead of zero because multiplying by zero
-# eliminates all the other fitness criteria.
-type Fitness = int
+
+def in_tolerance(b, m) -> bool:
+    return b <= m <= b + 1 + most_significant_bit(b)
+
+
+class Fitness(BaseModel):
+    measurements: tuple[int, ...]
+    baselines: tuple[int, ...] | None = None
+
+    @cached_property
+    def total(self) -> int:
+        if self.baselines is not None:
+            # if the measurement is within the tolerance threshold, use the baselines value
+            return prod(
+                b if in_tolerance(b, m) else m
+                for b, m in zip(self.baselines, self.measurements)
+            )
+        else:
+            return prod(self.measurements)
+
+    def build_next(self, next_measurements: tuple[int, ...]) -> Self:
+        return Fitness(measurements=next_measurements, baselines=self.measurements)
+
+    def __eq__(self, other: Self) -> bool:
+        return self.total == other.total
+
+    def __lt__(self, other: Self) -> bool:
+        return self.total < other.total
+
+    def __le__(self, other: Self) -> bool:
+        return self.total <= other.total
+
+    def __gt__(self, other: Self) -> bool:
+        return self.total > other.total
+
+    def __ge__(self, other: Self) -> bool:
+        return self.total >= other.total
 
 
 class Coach(HasStep):
@@ -179,12 +218,14 @@ class Health(Coach):
         )[0]
 
         return (
-            target_activations_component ** 1
-            * activation_variance_component ** 1
-            * target_axon_distance_component ** 1
-            * axon_load_component ** 1
-            * axon_variance_component ** 1
-            * activations_set_component ** 1,
+            (
+                target_activations_component,
+                activation_variance_component,
+                target_axon_distance_component,
+                axon_load_component,
+                axon_variance_component,
+                activations_set_component,
+            ),
             LessonPlan(plan={lesson: Gear(up=lesson_weight)}),
         )
 
@@ -222,7 +263,7 @@ class PetriDish(HasRandom):
         # number of mutations in each descendant
         self.num_mutations = num_mutations
 
-        self.samples: list[tuple[Dna, Fitness]] = []
+        self.samples: list[tuple[Dna, tuple[Fitness, LessonPlan]]] = []
         self.mutator = Mutator()
 
     def evolve(
@@ -238,13 +279,13 @@ class PetriDish(HasRandom):
             new_samples: list[tuple[Dna, tuple[Fitness, LessonPlan]]] = []
 
             if initial_samples:
-                descendants = initial_samples
+                descendants: list[tuple[Dna, Fitness | None]] = [(dna, None) for dna in initial_samples]
                 initial_samples = None
             else:
                 # mutate the DNA
-                descendants = []
+                descendants: list[tuple[Dna, Fitness | None]] = []
 
-                for sample, (_, lesson_plan) in self.samples:
+                for sample, (fitness, lesson_plan) in self.samples:
                     for _ in range(self.num_descendants):
                         descendant = sample.model_copy(deep=True)
 
@@ -254,9 +295,9 @@ class PetriDish(HasRandom):
                             lesson_plan=lesson_plan,
                         )
 
-                        descendants.append(descendant)
+                        descendants.append((descendant, fitness))
 
-            for descendant in descendants:
+            for descendant, previous_fitness in descendants:
                 # build the descendant mind
                 mind: MindInterface = descendant.build_mind()
                 mind.mind.randomize_potential()
@@ -270,7 +311,14 @@ class PetriDish(HasRandom):
                     self.coach.step(c_time)
                     c_time += 1
 
-                new_samples.append((descendant, self.coach.measure()))
+                measurements, lesson_plan = self.coach.measure()
+
+                if previous_fitness is not None:
+                    fitness = previous_fitness.build_next(measurements)
+                else:
+                    fitness = Fitness(measurements=measurements)
+
+                new_samples.append((descendant, (fitness, lesson_plan)))
 
             # keep the most fit
             # prepending new samples allows for drift on ties due to stable sort
@@ -280,5 +328,5 @@ class PetriDish(HasRandom):
                 key=lambda x: x[1][0],
             )
 
-            print((num_generations, [fitness for _, (fitness, _) in self.samples]))
+            print((num_generations, [(fitness.total, fitness.measurements) for _, (fitness, _) in self.samples]))
             num_generations += 1

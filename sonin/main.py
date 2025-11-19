@@ -231,8 +231,10 @@ def evolve(
 
 if __name__ == '__main__':
     seed(1)
-    name = '3'
-    samples = load_samples_local(name)
-    # samples = [Dna.from_defaults()]
-    # evolve(samples, name, 32, timedelta(minutes=0))
-    run_and_plot(samples[0])
+    name = '1'
+
+    samples = [Dna.from_defaults()]
+    # samples = load_samples_local(name)
+
+    evolve(samples, name, 32, timedelta(minutes=60))
+    # run_and_plot(samples[0])
