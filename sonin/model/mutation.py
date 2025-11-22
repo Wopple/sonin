@@ -13,7 +13,7 @@ from sonin.sonin_random import HasRandom, Random
 # allows for scaling up and scaling down, 1 would not allow for scaling down while remaining above 0
 BASE_WEIGHT = 16
 
-MAX_SYNAPSES = 4
+MAX_SYNAPSES = 8
 
 
 def random_relative_coordinate(deviation_weight: int, random: Random) -> tuple[int, int]:
@@ -591,8 +591,8 @@ class FillMutagen(Mutagen):
         offset_fill: OffsetFillMutagen | None = None,
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
-        self.modulo_fill = modulo_fill or ModuloFillMutagen()
-        self.offset_fill = offset_fill or OffsetFillMutagen()
+        self.modulo_fill = modulo_fill or ModuloFillMutagen(deviation_weight=deviation_weight)
+        self.offset_fill = offset_fill or OffsetFillMutagen(deviation_weight=deviation_weight)
 
     def mutate(
         self,
@@ -618,7 +618,7 @@ class FillShapeMutagen(Mutagen):
         fill: FillMutagen | None = None,
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
-        self.fill = fill or FillMutagen()
+        self.fill = fill or FillMutagen(deviation_weight=deviation_weight)
 
     def mutate(
         self,
@@ -657,8 +657,8 @@ class RectangleShapeMutagen(Mutagen, TupleIntOps):
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
         TupleIntOps.__init__(self)
-        self.center = center or PositionMutagen()
-        self.fill = fill or FillMutagen()
+        self.center = center or PositionMutagen(deviation_weight=deviation_weight)
+        self.fill = fill or FillMutagen(deviation_weight=deviation_weight)
 
     def mutate(
         self,
@@ -714,8 +714,8 @@ class CityShapeMutagen(Mutagen, IntOps):
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
         IntOps.__init__(self)
-        self.center = center or PositionMutagen()
-        self.fill = fill or FillMutagen()
+        self.center = center or PositionMutagen(deviation_weight=deviation_weight)
+        self.fill = fill or FillMutagen(deviation_weight=deviation_weight)
 
     def mutate(
         self,
@@ -771,9 +771,9 @@ class ShapeMutagen(Mutagen):
         city_shape: CityShapeMutagen | None = None,
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
-        self.fill_shape = fill_shape or FillShapeMutagen()
-        self.rectangle_shape = rectangle_shape or RectangleShapeMutagen()
-        self.city_shape = city_shape or CityShapeMutagen()
+        self.fill_shape = fill_shape or FillShapeMutagen(deviation_weight=deviation_weight)
+        self.rectangle_shape = rectangle_shape or RectangleShapeMutagen(deviation_weight=deviation_weight)
+        self.city_shape = city_shape or CityShapeMutagen(deviation_weight=deviation_weight)
 
     def mutate(
         self,
@@ -806,9 +806,13 @@ class FateMutagen(Mutagen, TupleIntOps):
         TupleIntOps.__init__(self)
         self.activation_level = activation_level or IntOps(min_value=1)
         self.refactory_period = refactory_period or IntOps(min_value=0)
-        self.stimulation = stimulation or StimulationMutagen()
+        self.stimulation = stimulation or StimulationMutagen(deviation_weight=deviation_weight)
         self.overstimulation_threshold = overstimulation_threshold or IntOps(min_value=1)
-        self.tetanic_period = tetanic_period or TetanicPeriodMutagen()
+        self.tetanic_period = tetanic_period or TetanicPeriodMutagen(deviation_weight=deviation_weight)
+
+        self.activation_level.deviation_weight = deviation_weight
+        self.refactory_period.deviation_weight = deviation_weight
+        self.overstimulation_threshold.deviation_weight = deviation_weight
 
     def mutate(
         self,
@@ -875,11 +879,8 @@ class FatePaintsMutagen(Mutagen):
         fate: FateMutagen | None = None,
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
-        self.paint = paint or ShapeMutagen()
-        self.fate = fate or FateMutagen()
-
-        self.paint.deviation_weight = deviation_weight
-        self.fate.deviation_weight = deviation_weight
+        self.paint = paint or ShapeMutagen(deviation_weight=deviation_weight)
+        self.fate = fate or FateMutagen(deviation_weight=deviation_weight)
 
     def mutate(
         self,
@@ -959,16 +960,16 @@ class FatePaintsMutagen(Mutagen):
 class Mutator(Mutagen):
     def __init__(
         self,
-        deviation_weight: int = 1,
+        deviation_weight: int = 4,
         max_synapses: MaxSynapsesMutagen | None = None,
         max_synapse_strength: MaxSynapseStrengthMutagen | None = None,
         max_axon_range: MaxAxonRangeMutagen | None = None,
         fate_paints: FatePaintsMutagen | None = None,
     ):
         Mutagen.__init__(self, deviation_weight=deviation_weight)
-        self.max_synapses = max_synapses or MaxSynapsesMutagen(deviation_weight=deviation_weight)
+        self.max_synapses = max_synapses or MaxSynapsesMutagen(deviation_weight=1)
         self.max_synapse_strength = max_synapse_strength or MaxSynapseStrengthMutagen(deviation_weight=deviation_weight)
-        self.max_axon_range = max_axon_range or MaxAxonRangeMutagen(deviation_weight=deviation_weight)
+        self.max_axon_range = max_axon_range or MaxAxonRangeMutagen(deviation_weight=1)
         self.fate_paints = fate_paints or FatePaintsMutagen(deviation_weight=deviation_weight)
 
     def mutate(

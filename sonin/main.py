@@ -6,7 +6,7 @@ from sonin.model.dna import Dna
 from sonin.model.evolution import Health, PetriDish
 from sonin.model.mind import Mind, MindInterface
 from sonin.model.storage import load_samples_local, save_samples_local
-from sonin.sonin_random import seed
+from sonin.sonin_random import Pcg32, Random, seed
 
 # Reading
 #   https://nba.uth.tmc.edu/neuroscience/m/s1/index.htm
@@ -154,7 +154,9 @@ from sonin.sonin_random import seed
 
 
 def run_and_plot(sample: Dna):
-    mind_interface: MindInterface = sample.build_mind()
+    rng = Pcg32()
+    rng.seed(1)
+    mind_interface: MindInterface = sample.build_mind(Random(rng))
     mind: Mind = mind_interface.mind
     mind.print_activations = True
     mind.randomize_potential()
@@ -221,7 +223,7 @@ def evolve(
     )
 
     petri_dish.evolve(
-        initial_samples=samples,
+        samples=samples,
         min_generations=min_generations,
         min_elapsed_time=min_elapsed_time,
     )
@@ -229,12 +231,16 @@ def evolve(
     save_samples_local(name, [s for s, _ in petri_dish.samples])
 
 
-if __name__ == '__main__':
+def main():
     seed(1)
     name = '1'
 
-    # samples = [Dna.from_defaults()]
-    samples = load_samples_local(name)
+    samples = [Dna.from_defaults()]
+    # samples = load_samples_local(name)
 
-    # evolve(samples, name, 32, timedelta(minutes=15))
-    run_and_plot(samples[0])
+    evolve(samples, name, 32, timedelta(minutes=0))
+    # run_and_plot(samples[0])
+
+
+if __name__ == '__main__':
+    main()

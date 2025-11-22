@@ -109,7 +109,7 @@ class Mind(BaseModel, HasRandom, HasStep):
 
     def randomize_synapses(self):
         for pre_n in self.neurons:
-            for i in range(self.max_synapses):
+            for i in range(self.rand_int(self.max_synapses)):
                 post_n = self.neurons.get(self.random_position(pre_n.axon.position, exclude_input=True))
 
                 if post_n:

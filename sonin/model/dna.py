@@ -8,7 +8,7 @@ from sonin.model.mind import Mind, MindInterface
 from sonin.model.neuron import Axon, Neuron
 from sonin.model.paint import CompleteFill, FillShape, RectangleShape, Shape
 from sonin.sonin_math import div
-from sonin.sonin_random import Pcg32, Random
+from sonin.sonin_random import Random
 
 
 class Dna(BaseModel):
@@ -51,7 +51,7 @@ class Dna(BaseModel):
             fate_paints=[(FillShape(fill=CompleteFill()), Fate.from_defaults(num_dimensions))],
         )
 
-    def build_mind(self, random: Random | None = None) -> MindInterface:
+    def build_mind(self, random: Random) -> MindInterface:
         # determine cell fates
         fate_positions: list[tuple[Vector, Fate] | None] = [None] * self.num_neurons
         fate_paints = self.fate_paints.copy()
@@ -94,7 +94,7 @@ class Dna(BaseModel):
             neurons=neurons,
         )
 
-        mind.random = random or Random(rng=Pcg32())
+        mind.random = random
 
         # set up the interface
         last_idx = self.dimension_size - 1

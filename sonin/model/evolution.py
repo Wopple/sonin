@@ -15,7 +15,7 @@ from sonin.model.mind import MindInterface
 from sonin.model.mutation import Mutator
 from sonin.model.step import HasStep
 from sonin.sonin_math import div, most_significant_bit
-from sonin.sonin_random import HasRandom
+from sonin.sonin_random import HasRandom, Pcg32, Random
 
 
 def in_tolerance(b, m) -> bool:
@@ -270,22 +270,23 @@ class PetriDish(HasRandom):
 
     def evolve(
         self,
-        initial_samples: list[Dna],
+        samples: list[Dna],
         min_generations: int = 1,
         min_elapsed_time: timedelta = timedelta(seconds=0),
     ):
-        num_generations = 0
         start_time = time.time()
+        priming = True
+        descendants: list[tuple[Dna, Fitness | None]] = [(dna, None) for dna in samples]
+        num_generations = 0
 
         while num_generations < min_generations or (time.time() - start_time) < min_elapsed_time.total_seconds():
             new_samples: list[tuple[Dna, tuple[Fitness, LessonPlan]]] = []
 
-            if initial_samples:
-                descendants: list[tuple[Dna, Fitness | None]] = [(dna, None) for dna in initial_samples]
-                initial_samples = None
+            if priming:
+                priming = False
             else:
                 # mutate the DNA
-                descendants: list[tuple[Dna, Fitness | None]] = []
+                descendants = []
 
                 for sample, (fitness, lesson_plan) in self.samples:
                     for _ in range(self.num_descendants):
@@ -301,7 +302,9 @@ class PetriDish(HasRandom):
 
             for descendant, previous_fitness in descendants:
                 # build the descendant mind
-                mind: MindInterface = descendant.build_mind()
+                rng = Pcg32()
+                rng.seed(1)
+                mind: MindInterface = descendant.build_mind(Random(rng))
                 mind.mind.randomize_potential()
 
                 # measure the fitness
