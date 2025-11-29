@@ -6,8 +6,8 @@ from sonin.model.metric import SlidingFrequencyProfile
 @mark.parametrize(
     'size, c_times, expected',
     [
-        (1, [], -1),
-        (1, [1], -1),
+        (1, [], None),
+        (1, [1], None),
         (1, [1, 2], 1),
         (1, [1, 2, 3], 1),
         (1, [1, 2, 3, 5], 2),
@@ -20,7 +20,7 @@ from sonin.model.metric import SlidingFrequencyProfile
     ],
 )
 def test_sliding_frequency_mean(size: int, c_times: list[int], expected: int):
-    frequency = SlidingFrequencyProfile(size)
+    frequency = SlidingFrequencyProfile(size=size)
 
     for c_time in c_times:
         frequency.record(c_time)
@@ -31,8 +31,8 @@ def test_sliding_frequency_mean(size: int, c_times: list[int], expected: int):
 @mark.parametrize(
     'size, c_times, expected',
     [
-        (1, [], -1),
-        (1, [1], -1),
+        (1, [], None),
+        (1, [1], None),
         (1, [1, 2], 0),
         (1, [1, 2, 3], 0),
         (1, [1, 2, 3, 5], 0),
@@ -47,7 +47,7 @@ def test_sliding_frequency_mean(size: int, c_times: list[int], expected: int):
     ],
 )
 def test_sliding_frequency_instability(size: int, c_times: list[int], expected: int):
-    frequency = SlidingFrequencyProfile(size)
+    frequency = SlidingFrequencyProfile(size=size)
 
     for c_time in c_times:
         frequency.record(c_time)

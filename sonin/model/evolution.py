@@ -11,7 +11,9 @@ from pydantic import BaseModel
 from sonin.model.dna import Dna
 from sonin.model.gear import Gear
 from sonin.model.lesson import Lesson, LessonPlan
+from sonin.model.metric import Metric
 from sonin.model.mind import MindInterface
+from sonin.model.mind_factory import MindFactory
 from sonin.model.mutation import Mutator
 from sonin.model.step import HasStep
 from sonin.sonin_math import div, most_significant_bit
@@ -22,12 +24,14 @@ def in_tolerance(b, m) -> bool:
     return b <= m <= b + 1 + most_significant_bit(b)
 
 
-class Fitness(BaseModel):
-    measurements: tuple[int, ...]
+class Sample(BaseModel):
+    dna: Dna
+    measurements: tuple[int, ...] | None = None
     baselines: tuple[int, ...] | None = None
+    paint_count_metric: Metric | None = None
 
     @cached_property
-    def total(self) -> int:
+    def total_fitness(self) -> int:
         if self.baselines is not None:
             # if the measurement is within the tolerance threshold, use the baselines value
             return prod(
@@ -37,23 +41,34 @@ class Fitness(BaseModel):
         else:
             return prod(self.measurements)
 
-    def build_next(self, next_measurements: tuple[int, ...]) -> Self:
-        return Fitness(measurements=next_measurements, baselines=self.measurements)
+    def build_next(self, dna: Dna) -> Self:
+        return Sample(dna=dna, baselines=self.measurements)
 
     def __eq__(self, other: Self) -> bool:
-        return self.total == other.total
+        return self.total_fitness == other.total_fitness
 
     def __lt__(self, other: Self) -> bool:
-        return self.total < other.total
+        return self.total_fitness < other.total_fitness
 
     def __le__(self, other: Self) -> bool:
-        return self.total <= other.total
+        return self.total_fitness <= other.total_fitness
 
     def __gt__(self, other: Self) -> bool:
-        return self.total > other.total
+        return self.total_fitness > other.total_fitness
 
     def __ge__(self, other: Self) -> bool:
-        return self.total >= other.total
+        return self.total_fitness >= other.total_fitness
+
+
+class Lineage(BaseModel):
+    parent: Sample
+    child: Sample
+
+    def build_next(self, dna: Dna, next_measurements: tuple[int, ...]) -> Self:
+        return Lineage(
+            parent=self.child,
+            child=self.child.build_next(dna, next_measurements)
+        )
 
 
 class Coach(HasStep):
@@ -65,6 +80,7 @@ class Coach(HasStep):
 
     def __init__(self):
         self.mind: MindInterface | None = None
+        self.sample: Sample | None = None
         self.done: bool = False
 
     @property
@@ -92,7 +108,7 @@ class Coach(HasStep):
     def post_step(self, c_time: int):
         pass
 
-    def measure(self) -> tuple[Fitness, LessonPlan]:
+    def measure(self) -> tuple[tuple[int, ...], LessonPlan]:
         raise NotImplementedError(f'{self.__class__.__name__}.measure')
 
     def reset(self):
@@ -131,7 +147,7 @@ class Health(Coach):
 
     def post_step(self, c_time: int):
         # target partial activity to avoid too much and too little activity
-        target_activations = div(len(self.mind.mind.neurons.items), 4)
+        target_activations = div(self.num_neurons, 4)
         num_activations = self.mind.mind.num_activations
 
         if num_activations > target_activations:
@@ -158,7 +174,7 @@ class Health(Coach):
         if c_time >= self.d_time:
             self.done = True
 
-    def measure(self) -> tuple[Fitness, LessonPlan]:
+    def measure(self) -> tuple[tuple[int, ...], LessonPlan]:
         # target activations
         target_activations_component = div(self.over_activations + self.under_activations, self.d_time) + 1
 
@@ -177,10 +193,7 @@ class Health(Coach):
             elif distance_diff < 0:
                 axons_under_distance += -distance_diff
 
-        target_axon_distance_component = div(
-            axons_over_distance + axons_under_distance,
-            len(self.mind.mind.neurons.items)
-        ) + 1
+        target_axon_distance_component = div(axons_over_distance + axons_under_distance, self.num_neurons) + 1
 
         # axon load
         max_axons_in_same_position = max(
@@ -191,7 +204,7 @@ class Health(Coach):
         axon_load_component = abs(self.target_axon_load - max_axons_in_same_position) + 1
 
         # axon variance
-        relative_values = {}
+        relative_values: dict[tuple[int, ...], int] = {}
 
         for n in self.mind.mind.neurons:
             relative_value = (n.position - n.axon.position).value
@@ -206,6 +219,20 @@ class Health(Coach):
         # activations set
         activations_set_component = max(self.activations_set_counts.values())
 
+        # paint mean
+        paint_mean_portion = 16
+        clipped_mean = min(paint_mean_portion, div(self.num_neurons, self.sample.paint_count_metric.mean))
+        paint_mean_component = paint_mean_portion - clipped_mean + 1
+
+        # paint instability
+        if self.sample.paint_count_metric.size >= div(paint_mean_portion, 2):
+            # only put this component into play once there are sufficient paints
+            average_instability = div(self.sample.paint_count_metric.instability, self.sample.paint_count_metric.size)
+            paint_instability_portion = min(self.num_neurons, average_instability + 1)
+        else:
+            # otherwise max it out
+            paint_instability_portion = self.num_neurons
+
         measurements = (
             target_activations_component,
             activation_variance_component,
@@ -213,6 +240,8 @@ class Health(Coach):
             axon_load_component,
             axon_variance_component,
             activations_set_component,
+            paint_mean_component,
+            paint_instability_portion,
         )
 
         need_more_axon_movement = False
@@ -265,32 +294,30 @@ class PetriDish(HasRandom):
         # number of mutations in each descendant
         self.num_mutations = num_mutations
 
-        self.samples: list[tuple[Dna, tuple[Fitness, LessonPlan]]] = []
+        self.samples: list[tuple[Sample, LessonPlan]] = []
         self.mutator = Mutator()
 
     def evolve(
         self,
-        samples: list[Dna],
+        initial_samples: list[Sample],
         min_generations: int = 1,
         min_elapsed_time: timedelta = timedelta(seconds=0),
     ):
         start_time = time.time()
-        priming = True
-        descendants: list[tuple[Dna, Fitness | None]] = [(dna, None) for dna in samples]
+        descendants: list[Sample] = initial_samples
         num_generations = 0
 
         while num_generations < min_generations or (time.time() - start_time) < min_elapsed_time.total_seconds():
-            new_samples: list[tuple[Dna, tuple[Fitness, LessonPlan]]] = []
+            new_samples: list[tuple[Sample, LessonPlan]] = []
 
-            if priming:
-                priming = False
-            else:
+            # the condition ensures we measure the input samples if they have no measurements
+            if all(d.measurements is not None for d in descendants):
                 # mutate the DNA
                 descendants = []
 
-                for sample, (fitness, lesson_plan) in self.samples:
+                for sample, lesson_plan in self.samples:
                     for _ in range(self.num_descendants):
-                        descendant = sample.model_copy(deep=True)
+                        descendant = sample.dna.model_copy(deep=True)
 
                         self.mutator.mutate(
                             dna=descendant,
@@ -298,17 +325,20 @@ class PetriDish(HasRandom):
                             lesson_plan=lesson_plan,
                         )
 
-                        descendants.append((descendant, fitness))
+                        descendants.append(sample.build_next(descendant))
 
-            for descendant, previous_fitness in descendants:
+            for descendant in descendants:
                 # build the descendant mind
                 rng = Pcg32()
                 rng.seed(1)
-                mind: MindInterface = descendant.build_mind(Random(rng))
+                factory = MindFactory(descendant.dna)
+                mind: MindInterface = factory.build_mind(Random(rng))
+                descendant.paint_count_metric = factory.paint_count_metric
                 mind.mind.randomize_potential()
 
                 # measure the fitness
                 self.coach.mind = mind
+                self.coach.sample = descendant
                 self.coach.reset()
                 c_time = 0
 
@@ -317,21 +347,16 @@ class PetriDish(HasRandom):
                     c_time += 1
 
                 measurements, lesson_plan = self.coach.measure()
-
-                if previous_fitness is not None:
-                    fitness = previous_fitness.build_next(measurements)
-                else:
-                    fitness = Fitness(measurements=measurements)
-
-                new_samples.append((descendant, (fitness, lesson_plan)))
+                descendant.measurements = measurements
+                new_samples.append((descendant, lesson_plan))
 
             # keep the most fit
             # prepending new samples allows for drift on ties due to stable sort
-            self.samples = heapq.nsmallest(
+            self.samples: list[tuple[Sample, LessonPlan]] = heapq.nsmallest(
                 self.sample_retention,
                 new_samples + self.samples,
-                key=lambda x: x[1][0],
+                key=lambda x: x[0],
             )
 
-            print((num_generations, [(fitness.total, fitness.measurements) for _, (fitness, _) in self.samples]))
+            print((num_generations, [(sample.total_fitness, sample.measurements) for sample, _ in self.samples]))
             num_generations += 1

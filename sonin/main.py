@@ -3,8 +3,9 @@ from datetime import timedelta
 import matplotlib.pyplot as plot
 
 from sonin.model.dna import Dna
-from sonin.model.evolution import Health, PetriDish
+from sonin.model.evolution import Health, PetriDish, Sample
 from sonin.model.mind import Mind, MindInterface
+from sonin.model.mind_factory import MindFactory
 from sonin.model.storage import load_samples_local, save_samples_local
 from sonin.sonin_random import Pcg32, Random, seed
 
@@ -153,10 +154,11 @@ from sonin.sonin_random import Pcg32, Random, seed
 #   - Nascent: does not have 60+ years of research behind it
 
 
-def run_and_plot(sample: Dna):
+def run_and_plot(dna: Dna):
     rng = Pcg32()
     rng.seed(1)
-    mind_interface: MindInterface = sample.build_mind(Random(rng))
+    factory = MindFactory(dna)
+    mind_interface: MindInterface = factory.build_mind(Random(rng))
     mind: Mind = mind_interface.mind
     mind.print_activations = True
     mind.randomize_potential()
@@ -210,7 +212,7 @@ def run_and_plot(sample: Dna):
 
 
 def evolve(
-    samples: list[Dna],
+    initial_samples: list[Sample],
     name: str,
     min_generations: int,
     min_elapsed_time: timedelta,
@@ -223,23 +225,23 @@ def evolve(
     )
 
     petri_dish.evolve(
-        samples=samples,
+        initial_samples=initial_samples,
         min_generations=min_generations,
         min_elapsed_time=min_elapsed_time,
     )
 
-    save_samples_local(name, [s for s, _ in petri_dish.samples])
+    save_samples_local(name, [s.dna for s, _ in petri_dish.samples])
 
 
 def main():
     seed(1)
     name = '1'
 
-    samples = [Dna.from_defaults()]
-    # samples = load_samples_local(name)
+    samples = [Sample(dna=Dna.from_defaults())]
+    # samples = [Sample(dna=dna) for dna in load_samples_local(name)]
 
     evolve(samples, name, 32, timedelta(minutes=0))
-    # run_and_plot(samples[0])
+    # run_and_plot(samples[0].dna)
 
 
 if __name__ == '__main__':

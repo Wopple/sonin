@@ -54,7 +54,7 @@ def weaken_connection(pre_neuron: Neuron, post_neuron: Neuron, strength: int):
 class Mind(BaseModel, HasRandom, HasStep):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # mutable properties
+    # configuration
     num_dimensions: int
     dimension_size: int
     max_synapses: int

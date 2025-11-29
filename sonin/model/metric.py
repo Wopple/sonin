@@ -1,20 +1,54 @@
 # Record behavior to make functional decisions and improve developer insight
+from pydantic import BaseModel, Field
+
 from sonin.sonin_math import div
 
 
-class SlidingFrequencyProfile:
+class Metric(BaseModel):
+    """
+    Basic metrics over a collection of values.
+    """
+
+    values: list[int] = Field(default_factory=list)
+
+    def record(self, value: int):
+        self.values.append(value)
+
+    @property
+    def size(self) -> int:
+        return len(self.values)
+
+    @property
+    def mean(self) -> int | None:
+        if self.values:
+            return div(sum(self.values), len(self.values))
+        else:
+            return None
+
+    @property
+    def instability(self) -> int | None:
+        """
+        Sum of distances from the mean of all recorded values.
+        """
+
+        mean = self.mean
+
+        if mean is not None:
+            return sum(abs(d - mean) for d in self.values)
+        else:
+            return None
+
+
+class SlidingFrequencyProfile(BaseModel):
     """
     Records a sliding window of the elapsed time since the last record based on the c_time of the events. Calculates
     metrics related to the frequency of events.
     """
 
-    def __init__(self, size: int):
-        assert size >= 1
-
-        self.size: int = size
-        self.last_time: int = -1
-        self.deltas: list[int] = []
-        self.i_next: int = 0
+    size: int = Field(ge=1)
+    last_time: int = -1
+    deltas: list[int] = Field(default_factory=list)
+    i_next: int = 0
 
     def record(self, c_time: int):
         if self.last_time == -1:
@@ -35,20 +69,21 @@ class SlidingFrequencyProfile:
         return len(self.deltas) == self.size
 
     @property
-    def mean(self) -> int:
-        if len(self.deltas) == 0:
-            return -1
-
-        return div(sum(self.deltas), len(self.deltas))
+    def mean(self) -> int | None:
+        if self.deltas:
+            return div(sum(self.deltas), len(self.deltas))
+        else:
+            return None
 
     @property
-    def instability(self) -> int:
+    def instability(self) -> int | None:
         """
         Sum of distances from the mean of all recorded deltas.
         """
+
         mean = self.mean
 
-        if mean == -1:
-            return -1
-
-        return sum(abs(d - mean) for d in self.deltas)
+        if mean is not None:
+            return sum(abs(d - mean) for d in self.deltas)
+        else:
+            return None
