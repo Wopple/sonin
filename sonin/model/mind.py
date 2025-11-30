@@ -194,6 +194,7 @@ class Mind(BaseModel, HasRandom, HasStep):
             print((self.num_activations, self.activation_set))
             print(s)
 
+    def cleanup(self, c_time: int):
         for n in self.neurons:
             if n.activated:
                 n.deactivate()
@@ -281,6 +282,9 @@ class MindInterface(BaseModel, HasStep):
 
     def step(self, c_time: int):
         self.mind.step(c_time)
+
+    def cleanup(self, c_time: int):
+        self.mind.cleanup(c_time)
 
     @staticmethod
     def activate_by(c_time: int, value: int, neurons: list[Neuron]):

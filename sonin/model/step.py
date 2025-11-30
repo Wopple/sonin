@@ -6,3 +6,10 @@ class HasStep:
         """
 
         pass
+
+    def cleanup(self, c_time: int):
+        """
+        Cleans up state to prepare for the next step.
+        """
+
+        pass

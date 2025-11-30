@@ -1,5 +1,6 @@
 from enum import IntEnum
 from math import gcd
+from typing import Self
 
 from pydantic import BaseModel
 
@@ -45,3 +46,8 @@ class LessonPlan(BaseModel):
 
             divisor = gcd(up, down)
             return Gear(up=div(up, divisor), down=div(down, divisor))
+        else:
+            raise ValueError(f'Invalid item: {item}')
+
+    def __add__(self, other: Self) -> Self:
+        return LessonPlan(plan={**self.plan, **other.plan})

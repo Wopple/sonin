@@ -36,7 +36,7 @@ class Dna(BaseModel):
         return self.dimension_size ** self.num_dimensions
 
     @classmethod
-    def from_defaults(cls, num_dimensions: int = 2, dimension_size: int = 10) -> Self:
+    def from_defaults(cls, num_dimensions: int = 2, dimension_size: int = 6) -> Self:
         return Dna(
             num_dimensions=num_dimensions,
             dimension_size=dimension_size,

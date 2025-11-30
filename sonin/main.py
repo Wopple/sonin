@@ -3,7 +3,7 @@ from datetime import timedelta
 import matplotlib.pyplot as plot
 
 from sonin.model.dna import Dna
-from sonin.model.evolution import Health, PetriDish, Sample
+from sonin.model.evolution import Coaches, Echo, Health, PetriDish, Sample
 from sonin.model.mind import Mind, MindInterface
 from sonin.model.mind_factory import MindFactory
 from sonin.model.storage import load_samples_local, save_samples_local
@@ -207,6 +207,7 @@ def run_and_plot(dna: Dna):
 
     for i in range(32):
         mind.step(i)
+        mind.cleanup(i)
 
     plot_synapses()
 
@@ -218,10 +219,10 @@ def evolve(
     min_elapsed_time: timedelta,
 ):
     petri_dish = PetriDish(
-        coach=Health(),
-        sample_retention=4,
-        num_descendants=4,
-        num_mutations=4,
+        coach=Coaches([Health(), Echo()]),
+        sample_retention=16,
+        num_descendants=1,
+        num_mutations=1,
     )
 
     petri_dish.evolve(

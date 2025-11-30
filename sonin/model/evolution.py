@@ -17,7 +17,7 @@ from sonin.model.mind_factory import MindFactory
 from sonin.model.mutation import Mutator
 from sonin.model.step import HasStep
 from sonin.sonin_math import div, most_significant_bit
-from sonin.sonin_random import HasRandom, Pcg32, Random
+from sonin.sonin_random import HasRandom, Pcg32, rand_int, Random
 
 
 def in_tolerance(b, m) -> bool:
@@ -60,17 +60,6 @@ class Sample(BaseModel):
         return self.total_fitness >= other.total_fitness
 
 
-class Lineage(BaseModel):
-    parent: Sample
-    child: Sample
-
-    def build_next(self, dna: Dna, next_measurements: tuple[int, ...]) -> Self:
-        return Lineage(
-            parent=self.child,
-            child=self.child.build_next(dna, next_measurements)
-        )
-
-
 class Coach(HasStep):
     """
     Interacts with a mind to elicit behavior.
@@ -79,9 +68,25 @@ class Coach(HasStep):
     """
 
     def __init__(self):
-        self.mind: MindInterface | None = None
-        self.sample: Sample | None = None
+        self._mind: MindInterface | None = None
+        self._sample: Sample | None = None
         self.done: bool = False
+
+    @property
+    def mind(self) -> MindInterface | None:
+        return self._mind
+
+    @mind.setter
+    def mind(self, mind: MindInterface):
+        self._mind = mind
+
+    @property
+    def sample(self) -> Sample | None:
+        return self._sample
+
+    @sample.setter
+    def sample(self, sample: Sample):
+        self._sample = sample
 
     @property
     def num_dimensions(self) -> int:
@@ -100,6 +105,9 @@ class Coach(HasStep):
         self.mind.step(c_time)
         self.post_step(c_time)
 
+    def cleanup(self, c_time: int):
+        self.mind.cleanup(c_time)
+
     # useful to send input
     def pre_step(self, c_time: int):
         pass
@@ -113,6 +121,64 @@ class Coach(HasStep):
 
     def reset(self):
         self.done = False
+
+
+class Coaches(Coach):
+    def __init__(self, coaches: list[Coach]):
+        Coach.__init__(self)
+        self.coaches = coaches
+
+    @property
+    def mind(self) -> MindInterface | None:
+        return self._mind
+
+    @mind.setter
+    def mind(self, mind: MindInterface):
+        self._mind = mind
+
+        for coach in self.coaches:
+            coach.mind = mind
+
+    @property
+    def sample(self) -> Sample | None:
+        return self._sample
+
+    @sample.setter
+    def sample(self, sample: Sample):
+        self._sample = sample
+
+        for coach in self.coaches:
+            coach.sample = sample
+
+    def step(self, c_time: int):
+        for coach in self.coaches:
+            if not coach.done:
+                coach.pre_step(c_time)
+
+        self.mind.step(c_time)
+
+        for coach in self.coaches:
+            if not coach.done:
+                coach.post_step(c_time)
+
+        self.done = all(coach.done for coach in self.coaches)
+
+    def measure(self) -> tuple[tuple[int, ...], LessonPlan]:
+        measurements = ()
+        lesson_plan = LessonPlan(plan={})
+
+        for coach in self.coaches:
+            next_measurements, next_lesson_plan = coach.measure()
+            measurements += next_measurements
+            lesson_plan += next_lesson_plan
+
+        return measurements, lesson_plan
+
+    def reset(self):
+        Coach.reset(self)
+
+        for coach in self.coaches:
+            coach.reset()
 
 
 class Health(Coach):
@@ -220,7 +286,7 @@ class Health(Coach):
         activations_set_component = max(self.activations_set_counts.values())
 
         # paint mean
-        paint_mean_portion = 16
+        paint_mean_portion = div(self.num_neurons, 8)
         clipped_mean = min(paint_mean_portion, div(self.num_neurons, self.sample.paint_count_metric.mean))
         paint_mean_component = paint_mean_portion - clipped_mean + 1
 
@@ -261,13 +327,57 @@ class Health(Coach):
         return measurements, LessonPlan(plan=plan)
 
     def reset(self):
-        super().reset()
+        Coach.reset(self)
         self.n_time = 0
         self.over_activations = 0
         self.under_activations = 0
         self.activation_variance_miss = 0
         self.activations_set_counts = {}
         self.previous_activations_set = None
+
+
+class Echo(Coach):
+    def __init__(self):
+        Coach.__init__(self)
+
+        # expect these values to be echoed back
+        # dict[time, value]
+        self.expectations: dict[int, int] = {}
+
+        # time when done
+        self.d_time: int = 64
+
+        # expect values to be echoed back in this many steps
+        self.delay: int = 2
+
+        # number of times the output did not match the expectation
+        self.output_misses: int = 0
+
+    @property
+    def max_input(self) -> int:
+        return 2 ** len(self.mind.input_neurons) - 1
+
+    def pre_step(self, c_time: int):
+        value = rand_int(0, self.max_input)
+        self.expectations[c_time + self.delay] = value
+        self.mind.input(c_time, value)
+
+    def post_step(self, c_time: int):
+        output = self.mind.output()
+        expected = self.expectations.get(c_time, 0)
+
+        if output != expected:
+            self.output_misses += bin(output ^ expected).count('0')
+
+        if c_time >= self.d_time:
+            self.done = True
+
+    def measure(self) -> tuple[tuple[int, ...], LessonPlan]:
+        return (self.output_misses + 1,), LessonPlan(plan={})
+
+    def reset(self):
+        Coach.reset(self)
+        self.output_misses = 0
 
 
 class PetriDish(HasRandom):
@@ -344,6 +454,7 @@ class PetriDish(HasRandom):
 
                 while not self.coach.done:
                     self.coach.step(c_time)
+                    self.coach.cleanup(c_time)
                     c_time += 1
 
                 measurements, lesson_plan = self.coach.measure()
