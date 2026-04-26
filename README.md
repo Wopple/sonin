@@ -1,6 +1,9 @@
 # Sonin
 
-A "failed" attempt at advancing past Multi-layer Perceptron.
+A "failed" attempt at advancing past Multi-layer Perceptron. Sonin is an experimental new neural network platform to
+introduce properties of biological minds that Multi-layer Perceptron lacks.
+
+Status: not actively developed
 
 ## Context
 
@@ -24,7 +27,7 @@ So to compete, we have to look at MLP's weaknesses. I can identify 2 major weakn
 1. No cycles in circuitry
 2. Stateless neurons
 
-Biological intelligence leverage cycles in circuitry all over the place. Even the simple cycles which are easier to
+Biological intelligence leverages cycles in circuitry all over the place. Even the simple cycles which are easier to
 study can yield some interesting behavior. The more complex circuitry that relies on cycles is likely far more potent.
 Cycles likely do not unlock intelligence that cannot be computed otherwise, instead they will unlock far more efficient
 ways to perform the computation.
@@ -73,9 +76,9 @@ likely have to process the mind multiple times before the input can yield a usef
 ### Neuroplasticity
 
 There are several kinds of neuroplasticity. Sonin attempts to simulate them. The simplest is Hebbian neuroplasticity. It
-is succinctly described as, "neurons the fire together, wire together." It's easy to see the "logic" behind this. If two
-neurons tend to fire around the same time, there may be an important dependency there, so establish one by strengthening
-connection.
+is succinctly described as, "neurons that fire together, wire together." It's easy to see the "logic" behind this. If
+two neurons tend to fire around the same time, there may be an important dependency there, so establish one by
+strengthening connection.
 
 ### Optimization
 
