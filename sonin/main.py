@@ -99,15 +99,7 @@ from sonin.sonin_random import Pcg32, Random, seed
 #     - Concentration gradients can have thresholds that affect the fate of cells.
 #     - Sequential induction can affect the fate of cells through one of the signaling mechanisms to neighbors.
 #     - Can develop new signals by cloning successful signals and varying them independently.
-#     + Signal exposure is inversely proportional to distance.
 #     - Local signals could have a maximum range and be all or nothing.
-#
-#   - Axon guidance is affected by:
-#     + both attractive and repulsive forces
-#     - near factors
-#     + far factors
-#     + guidance cells (implemented as signals from cell division)
-#     - following existing axons
 #
 #   - Synapses will compete and favor the more active one.
 #   - Activity dependent signals will prune synapses.
@@ -144,8 +136,8 @@ from sonin.sonin_random import Pcg32, Random, seed
 #   - Cycles: logical circuits can form cyclic graphs
 #   - Memory: each neuron is stateful to support memory
 #   - Neuroplasticity: the connections of neurons can update through activity to support learning from experience
-#   - Incrementality: can build upon existing models
-#   - Coaching: can perform optimization without data through coaches
+#   - Incrementality: can build upon existing models instead of training from scratch
+#   - Coaching: can perform optimization with little to no data through coaches
 #   - Customization: there are endless ways to customize the mechanics
 
 # Disadvantages
