@@ -116,6 +116,17 @@ each neuron needs to provide much more meaningful intelligence than each neuron 
 
 ## So... does it work?
 
-Not really. I have gotten it to the point where I can get it to optimize for what I consider to be a healthy mind (e.g.
-not brain dead, little repetitive behavior, etc.), but I have not gotten it to the point where it can optimize for
-useful tasks. To get there will require significantly more research.
+Not really. I have gotten it to optimize for certain properties, but not for useful tasks. Significantly more research
+is required to keep this moving forward. The main bottleneck is the quality of the mutations. The DNA needs a mechanism
+that balances these properties:
+
+- expressiveness of the primitives (the full set of possible intelligences should be supported)
+- impactful changes when mutated (each mutation should make a noticeable difference)
+- controlled changes when mutated (each mutation should remain "near" the current state)
+
+The devil is in the details. The general idea and structure was easy to implement and mostly works. However, the means
+of configuring, generating, and mutating the minds has a very long way to go. So far it's been trial and error, and it's
+all error. I have yet to find a path that shows promise.
+
+If I were to continue this, my next step would be search for prior art in the domain of emergent algorithms to look for
+inspiration.
