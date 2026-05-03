@@ -110,7 +110,12 @@ class Mind(BaseModel, HasRandom, HasStep):
     def randomize_synapses(self):
         for pre_n in self.neurons:
             for i in range(self.rand_int(self.max_synapses)):
-                post_n = self.neurons.get(self.random_position(pre_n.axon.position, exclude_input=True))
+                post_position = self.random_position(pre_n.axon.position, exclude_input=True)
+
+                if post_position is None:
+                    continue
+
+                post_n = self.neurons.get(post_position)
 
                 if post_n:
                     strengthen_connection(
@@ -261,7 +266,7 @@ class MindInterface(BaseModel, HasStep):
 
         input_positions = list(self.input_shape.positions(self.mind.num_dimensions, self.mind.dimension_size))
         self.input_neurons = [self.mind.neurons.get(p) for p in input_positions]
-        input_indices.union({p.index for p in input_positions})
+        input_indices |= {p.index for p in input_positions}
 
         self.output_neurons = [
             self.mind.neurons.get(p)
@@ -271,12 +276,12 @@ class MindInterface(BaseModel, HasStep):
         if self.reward_shape:
             reward_positions = list(self.reward_shape.positions(self.mind.num_dimensions, self.mind.dimension_size))
             self.reward_neurons = [self.mind.neurons.get(p) for p in reward_positions]
-            input_indices.union({p.index for p in reward_positions})
+            input_indices |= {p.index for p in reward_positions}
 
         if self.punish_shape:
             punish_positions = list(self.punish_shape.positions(self.mind.num_dimensions, self.mind.dimension_size))
             self.punish_neurons = [self.mind.neurons.get(p) for p in punish_positions]
-            input_indices.union({p.index for p in punish_positions})
+            input_indices |= {p.index for p in punish_positions}
 
         self.mind.input_indices = input_indices
 

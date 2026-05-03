@@ -493,7 +493,7 @@ class TetanicPeriodMutagen(Mutagen):
         tetanic_period.activations = self.activations.add(tetanic_period.activations)
 
     def dec_activations(self, tetanic_period: TetanicPeriod):
-        tetanic_period.activations = self.activations.add(tetanic_period.activations)
+        tetanic_period.activations = self.activations.sub(tetanic_period.activations)
 
     def inc_gap(self, tetanic_period: TetanicPeriod):
         tetanic_period.gap = self.gap.sub(tetanic_period.gap)

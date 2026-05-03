@@ -233,7 +233,7 @@ def main():
     samples = [Sample(dna=Dna.from_defaults())]
     # samples = [Sample(dna=dna) for dna in load_samples_local(name)]
 
-    evolve(samples, name, 32, timedelta(minutes=0))
+    evolve(samples, name, 32, timedelta(minutes=2))
     # run_and_plot(samples[0].dna)
 
 

@@ -1,7 +1,6 @@
 import heapq
 import time
 from datetime import timedelta
-from functools import cached_property
 from itertools import groupby
 from math import prod
 from typing import Self
@@ -28,21 +27,52 @@ class Sample(BaseModel):
     dna: Dna
     measurements: tuple[int, ...] | None = None
     baselines: tuple[int, ...] | None = None
+    tolerances: tuple[int, ...] | None = None
+    health_mask: tuple[bool, ...] | None = None
     paint_count_metric: Metric | None = None
 
-    @cached_property
-    def total_fitness(self) -> int:
-        if self.baselines is not None:
-            # if the measurement is within the tolerance threshold, use the baselines value
-            return prod(
+    @property
+    def total_fitness(self) -> tuple[int, int]:
+        # parent-relative noise snap: if a measurement is within the parent's tolerance
+        # band, treat it as the parent's value so noise doesn't propagate
+        snapped = (
+            tuple(
                 b if in_tolerance(b, m) else m
                 for b, m in zip(self.baselines, self.measurements)
             )
-        else:
-            return prod(self.measurements)
+            if self.baselines is not None
+            else self.measurements
+        )
 
-    def build_next(self, dna: Dna) -> Self:
-        return Sample(dna=dna, baselines=self.measurements)
+        # if mask not set yet, treat every axis as health (gen-0 semantics)
+        mask = self.health_mask or (True,) * len(snapped)
+        # if no bands yet, every axis has band=0 (gen-0 / pre-tolerance semantics)
+        tols = self.tolerances or (0,) * len(snapped)
+
+        # primary key: product of (1 + excess) over health axes only.
+        # axes inside their band contribute factor 1 (multiplicative identity).
+        health = prod(
+            1 + max(0, m - t)
+            for m, t, h in zip(snapped, tols, mask)
+            if h
+        )
+        # secondary key: product of task measurements
+        task = prod(m for m, h in zip(snapped, mask) if not h)
+
+        return health, task
+
+    def build_next(
+        self,
+        dna: Dna,
+        tolerances: tuple[int, ...] | None = None,
+        health_mask: tuple[bool, ...] | None = None,
+    ) -> Self:
+        return Sample(
+            dna=dna,
+            baselines=self.measurements,
+            tolerances=tolerances,
+            health_mask=health_mask,
+        )
 
     def __eq__(self, other: Self) -> bool:
         return self.total_fitness == other.total_fitness
@@ -67,10 +97,19 @@ class Coach(HasStep):
     Records metrics for the purpose of producing a final measurement of fitness.
     """
 
+    # Required on every concrete Coach. 'health' axes participate in tolerance bands;
+    # 'task' axes are evaluated only after health is satisfied.
+    kind: str
+    measurement_arity: int
+
     def __init__(self):
         self._mind: MindInterface | None = None
         self._sample: Sample | None = None
         self.done: bool = False
+
+    @property
+    def health_mask(self) -> tuple[bool, ...]:
+        return (self.kind == 'health',) * self.measurement_arity
 
     @property
     def mind(self) -> MindInterface | None:
@@ -129,6 +168,17 @@ class Coaches(Coach):
         self.coaches = coaches
 
     @property
+    def measurement_arity(self) -> int:
+        return sum(c.measurement_arity for c in self.coaches)
+
+    @property
+    def health_mask(self) -> tuple[bool, ...]:
+        mask: tuple[bool, ...] = ()
+        for c in self.coaches:
+            mask += c.health_mask
+        return mask
+
+    @property
     def mind(self) -> MindInterface | None:
         return self._mind
 
@@ -185,6 +235,9 @@ class Health(Coach):
     """
     Selects for traits indicative of a healthy mind.
     """
+
+    kind = 'health'
+    measurement_arity = 8
 
     def __init__(
         self,
@@ -337,6 +390,9 @@ class Health(Coach):
 
 
 class Echo(Coach):
+    kind = 'task'
+    measurement_arity = 1
+
     def __init__(self):
         Coach.__init__(self)
 
@@ -367,7 +423,7 @@ class Echo(Coach):
         expected = self.expectations.get(c_time, 0)
 
         if output != expected:
-            self.output_misses += bin(output ^ expected).count('0')
+            self.output_misses += bin(output ^ expected).count('1')
 
         if c_time >= self.d_time:
             self.done = True
@@ -391,6 +447,7 @@ class PetriDish(HasRandom):
         sample_retention: int = 4,
         num_descendants: int = 4,
         num_mutations: int = 4,
+        health_patience: int = 64,
     ):
         # exercises the mind while measuring performance
         self.coach = coach
@@ -404,8 +461,21 @@ class PetriDish(HasRandom):
         # number of mutations in each descendant
         self.num_mutations = num_mutations
 
+        # generations of no per-axis improvement before health bands freeze
+        self.health_patience = health_patience
+
         self.samples: list[tuple[Sample, LessonPlan]] = []
         self.mutator = Mutator()
+
+        # per-axis health tolerance bands. None while health is still improving;
+        # frozen at the per-axis best (plus msb-noise) once plateau is reached.
+        self.tolerances: tuple[int, ...] | None = None
+
+        # best (smallest) measurement seen on each axis across all generations
+        self.best_measurements: tuple[int, ...] | None = None
+
+        # generations since any axis's best improved
+        self.generations_without_improvement: int = 0
 
     def evolve(
         self,
@@ -416,6 +486,13 @@ class PetriDish(HasRandom):
         start_time = time.time()
         descendants: list[Sample] = initial_samples
         num_generations = 0
+
+        # which measurement axes are health vs task — fixed for the run
+        health_mask = self.coach.health_mask
+
+        # tag initial samples so their first total_fitness uses the right mask
+        for d in descendants:
+            d.health_mask = health_mask
 
         while num_generations < min_generations or (time.time() - start_time) < min_elapsed_time.total_seconds():
             new_samples: list[tuple[Sample, LessonPlan]] = []
@@ -435,7 +512,11 @@ class PetriDish(HasRandom):
                             lesson_plan=lesson_plan,
                         )
 
-                        descendants.append(sample.build_next(descendant))
+                        descendants.append(sample.build_next(
+                            descendant,
+                            tolerances=self.tolerances,
+                            health_mask=health_mask,
+                        ))
 
             for descendant in descendants:
                 # build the descendant mind
@@ -461,6 +542,12 @@ class PetriDish(HasRandom):
                 descendant.measurements = measurements
                 new_samples.append((descendant, lesson_plan))
 
+            # refresh retained samples to the current bands so they're ranked under
+            # the same tolerances as the new descendants
+            for sample, _ in self.samples:
+                sample.tolerances = self.tolerances
+                sample.health_mask = health_mask
+
             # keep the most fit
             # prepending new samples allows for drift on ties due to stable sort
             self.samples: list[tuple[Sample, LessonPlan]] = heapq.nsmallest(
@@ -469,5 +556,42 @@ class PetriDish(HasRandom):
                 key=lambda x: x[0],
             )
 
-            print((num_generations, [(sample.total_fitness, sample.measurements) for sample, _ in self.samples]))
+            # track the per-axis best across retained samples and freeze bands
+            # only after `health_patience` generations of no improvement on any
+            # axis. Until then, tolerances stay None so health drives selection.
+            if self.samples and self.tolerances is None:
+                arity = len(self.samples[0][0].measurements)
+                gen_best = tuple(
+                    min(s.measurements[i] for s, _ in self.samples)
+                    for i in range(arity)
+                )
+
+                if self.best_measurements is None:
+                    self.best_measurements = gen_best
+                    self.generations_without_improvement = 0
+                else:
+                    improved = any(g < b for g, b in zip(gen_best, self.best_measurements))
+                    self.best_measurements = tuple(
+                        min(g, b) for g, b in zip(gen_best, self.best_measurements)
+                    )
+                    if improved:
+                        self.generations_without_improvement = 0
+                    else:
+                        self.generations_without_improvement += 1
+
+                if self.generations_without_improvement >= self.health_patience:
+                    # freeze bands at best + msb-noise slack so small regressions
+                    # that opportunistically buy task progress are tolerated
+                    self.tolerances = tuple(
+                        b + 1 + most_significant_bit(b)
+                        for b in self.best_measurements
+                    )
+
+            print((
+                num_generations,
+                self.generations_without_improvement,
+                self.tolerances,
+                [(sample.total_fitness, sample.measurements) for sample, _ in self.samples],
+            ))
+
             num_generations += 1
